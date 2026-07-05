@@ -67,6 +67,36 @@ async function expandTitleRow(page: Page, titleId: string): Promise<void> {
   }
 }
 
+/**
+ * Format-level actions (Delete Paperback, Download manuscript, …) live in an
+ * ellipsis "other actions" popover inside the row's actions cell — not in the
+ * "Manage title" itemset menu. Open it so the action links become visible.
+ */
+async function openFormatActionsPopover(page: Page, titleId: string): Promise<boolean> {
+  const trigger = page
+    .locator(`span[id$="${titleId}-other-actions"] a.a-popover-trigger, span[id$="${titleId}-other-actions"]`)
+    .first()
+  if (await trigger.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await trigger.click({ timeout: 10_000 }).catch(() => {})
+    await page.waitForTimeout(1500)
+    return true
+  }
+  // Fallback: any visible popover trigger inside the row's actions cell.
+  const cellTriggers = page.locator(
+    `td#${titleId}-actions span.a-declarative[data-action="a-popover"] a.a-popover-trigger`,
+  )
+  const count = await cellTriggers.count().catch(() => 0)
+  for (let i = 0; i < count; i++) {
+    const t = cellTriggers.nth(i)
+    if (await t.isVisible().catch(() => false)) {
+      await t.click({ timeout: 10_000 }).catch(() => {})
+      await page.waitForTimeout(1500)
+      return true
+    }
+  }
+  return false
+}
+
 function formatDeletePrefix(format: KdpBookFormat): string {
   return format === 'kindle' ? 'kindle_delete' : format === 'hardcover' ? 'hardcover_delete' : 'print_delete'
 }
@@ -90,16 +120,28 @@ export async function deleteTitleOnPage(
     }
   }
 
-  await expandTitleRow(page, titleId)
-
   const prefix = formatDeletePrefix(format)
-  const deleteLink = row.locator(`a[id^="${prefix}-"]`).first()
-  let clicked = await deleteLink
-    .click({ timeout: 10_000, force: true })
-    .then(() => true)
-    .catch(() => false)
+
+  // Delete links are hidden inside the row's "other actions" ellipsis popover.
+  await openFormatActionsPopover(page, titleId)
+
+  let deleteLink = row.locator(`a[id^="${prefix}-"]:visible`).first()
+  if ((await deleteLink.count()) === 0) {
+    // Popover content may be teleported outside the row element.
+    deleteLink = page.locator(`a[id^="${prefix}-"]:visible`).first()
+  }
+
+  let clicked = false
+  if ((await deleteLink.count()) > 0) {
+    clicked = await deleteLink
+      .click({ timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false)
+  }
 
   if (!clicked) {
+    // Last resort: JS-click the link inside the row (may be a no-op if KDP
+    // requires the popover flow — verification below catches that).
     clicked = await page
       .evaluate(
         ({ id, pfx }) => {
@@ -129,10 +171,32 @@ export async function deleteTitleOnPage(
   }
 
   await page.waitForTimeout(2000)
-  const confirm = page.getByRole('button', { name: /delete|confirm|yes/i }).first()
+  // KDP shows an "Are you sure?" modal whose confirm button is "#delete-title-ok-announce" (label "OK").
+  const confirm = page
+    .locator('#delete-title-ok-announce:visible')
+    .or(page.locator('[role=dialog]:visible, .a-popover:visible').getByRole('button', { name: /^(OK|Delete|Confirm|Yes)$/i }))
+    .first()
   if (await confirm.isVisible({ timeout: 5000 }).catch(() => false)) {
     await confirm.click({ timeout: 10_000 })
     await page.waitForLoadState('networkidle', { timeout: 60_000 }).catch(() => {})
+  }
+
+  // Verify the format row is actually gone instead of blindly reporting success.
+  await page.waitForTimeout(3000)
+  await kdpGoto(page, BOOKSHELF_URL, { waitUntil: 'networkidle', timeout: 120_000 })
+  const stillThere = await page
+    .locator(`tr[id="${titleId}"] a[id^="${prefix}-"]`)
+    .count()
+    .then((c) => c > 0)
+    .catch(() => false)
+  if (stillThere) {
+    return {
+      titleId,
+      format,
+      action: 'delete',
+      success: false,
+      errors: ['Delete was clicked but the title is still on the Bookshelf. It may require manual deletion.'],
+    }
   }
 
   return { titleId, format, action: 'delete', success: true, errors: [] }
