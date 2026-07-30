@@ -7,8 +7,8 @@
   "scripts": {
     "server": "tsx watch server/src/index.ts",
     "server:start": "tsx server/src/index.ts",
-    "postinstall": "playwright install chromium",
     "login": "node scripts/kdp-cli.mjs login",
+    "browser:check": "tsx scripts/browser-check.ts",
     "status": "node scripts/kdp-cli.mjs status",
     "download:report": "node scripts/kdp-cli.mjs download-report",
     "sync:metadata": "node scripts/kdp-cli.mjs sync-metadata",

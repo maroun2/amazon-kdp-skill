@@ -1,4 +1,5 @@
-import { chromium, type Page } from 'playwright'
+import type { Page } from 'playwright'
+import { launchKdpBrowser } from './browserLaunch.js'
 import { KDP_API, KDP_PMR_PAGE, KDP_ROYALTIES_PAGE } from './config.js'
 import { kdpFetchJson, kdpFetchText, kdpGoto, kdpRequestGet } from './kdpHttp.js'
 import { mergeWorkbookBuffers } from './mergeWorkbooks.js'
@@ -66,10 +67,7 @@ async function withKdpPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
     throw new KdpAuthError()
   }
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--disable-blink-features=AutomationControlled'],
-  })
+  const browser = await launchKdpBrowser({ headless: true })
 
   try {
     const context = await browser.newContext({ storageState: sessionFilePath() })
