@@ -120,7 +120,20 @@ Global rate limit (KDP_REQUEST_DELAY_MS between every request)
 | Archive title | `POST /api/kdp/titles/archive` |
 | Recovery learnings | `GET /api/kdp/recovery/learnings` |
 
-Always **dry-run one book** before live writes on additional books. Never set `publish: true` without explicit user confirmation.
+Always **dry-run one book** before live writes on additional books. `dryRun` defaults to
+**true**, so a live write must set `"dryRun": false` explicitly.
+
+**Publish, unpublish, delete and archive are gated in code, not by this instruction.** They
+return `403 approval_required` unless the request carries a one-shot ticket bound to that
+exact book:
+
+```bash
+npm run approve -- delete TITLE_ID FORMAT   # prints a token, expires in 10 min, single use
+```
+
+**Ask the user before minting a ticket.** Minting one on their behalf, without being asked,
+defeats the entire point of the gate. If the server has `KDP_API_TOKEN` set, keep it in the
+environment — never print it, never put it in a spec file.
 
 Batch REST endpoints (`/batch`) are for manual/advanced use. **Agents must not use them for multi-book work** — call the single-book endpoint repeatedly, one title at a time, waiting for each to complete.
 
@@ -143,7 +156,7 @@ If recovery exhausts retries, read `errors` and `recoveryLog`, then fix the unde
 5. **Metadata/pricing updates**: dry-run one book, then apply live changes **one book per request**.
 6. **Verify saves** by re-reading metadata from KDP (built into update flows).
 7. **Categories**: writable via browse node IDs or modal path picker (`POST /api/kdp/categories/update` or publish wizard).
-8. **Publish**: use `npm run publish:book` dry-run first; live publish requires `"publish": true` and user confirmation. **One book per `publish:book` invocation.**
+8. **Publish**: use `npm run publish:book` dry-run first; live publish requires `"publish": true`, `"dryRun": false`, and an approval ticket the user asked for. **One book per `publish:book` invocation.**
 
 ## References
 
