@@ -22,14 +22,26 @@ npm run status
 
 `connected: true` → ready. `connected: false` → start login flow below.
 
-## Sign in (agent-driven)
+## Sign in (agent-driven, machine with a display)
 
 1. Agent starts server if needed.
 2. Agent runs: `npm run login`
 3. **Tell the user** to complete Amazon sign-in in the visible Chromium window (MFA if prompted).
 4. Agent polls: `npm run status` until `connected: true`
 
-Session saved to `.kdp-session/amazon-kdp.json`.
+Session saved to `~/.config/amazon-kdp-skill/amazon-kdp.json` (mode 0600).
+
+## Sign in (headless machine — no display)
+
+`npm run login` fails fast here with `code: no_display`. There is no way to complete
+Amazon sign-in on this machine; do **not** retry, and do not ask the user to run it again.
+
+1. **Tell the user** to capture the session on a machine that has a browser, following
+   `docs/HEADLESS-LOGIN.md`, and copy the file over.
+2. Agent runs: `npm run session:import -- <path-to-storage-state.json>`
+3. Agent runs: `npm run session:verify`
+
+Never print, echo, or paste the contents of the storage-state file.
 
 ## Disconnect
 
@@ -49,7 +61,8 @@ Clears session cookies and local metadata cache.
 
 ## Errors
 
-- **401 on any endpoint** → session expired; re-run login
+- **401 on any endpoint** → session expired; re-run login (or re-import on a headless machine)
+- **`code: no_display` from login** → headless host; use the import path above, do not retry
 - **Login already in progress** → wait for browser window to finish
 
 See [references/troubleshooting.md](../../references/troubleshooting.md).

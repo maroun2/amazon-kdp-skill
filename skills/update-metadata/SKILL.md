@@ -66,7 +66,7 @@ JSON shape:
 
 ## Rate limiting
 
-The server spaces **every** KDP page load and API call by `KDP_REQUEST_DELAY_MS` (default 4 seconds). Batch updates also wait between books. Increase in `.env` if Amazon returns "Server Busy".
+The server waits a random **4-10 seconds** before **every** KDP page load and API call (`KDP_REQUEST_DELAY_MIN_MS` / `KDP_REQUEST_DELAY_MAX_MS`). Batch updates also wait between books. Raise the window in `.env` if Amazon returns "Server Busy".
 
 ## API
 
