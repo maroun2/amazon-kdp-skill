@@ -7,10 +7,11 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+import { launchKdpBrowser } from '../server/src/browserLaunch.js'
+import { sessionFilePath } from './lib/sessionPaths.mjs'
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
-const sessionFile = path.join(repoRoot, '.kdp-session', 'amazon-kdp.json')
+const sessionFile = sessionFilePath()
 const outFile = path.join(repoRoot, 'output', 'kdp-api-discovery.json')
 
 const REPORTS_ORIGIN = 'https://kdpreports.amazon.com'
@@ -93,7 +94,7 @@ async function main() {
     process.exit(1)
   }
 
-  const browser = await chromium.launch({ headless: true })
+  const browser = await launchKdpBrowser({ headless: true })
   const context = await browser.newContext({ storageState: sessionFile })
   const page = await context.newPage()
 

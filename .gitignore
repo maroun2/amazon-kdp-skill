@@ -7,3 +7,12 @@ output/
 .DS_Store
 scripts/spreadsheet-apply-results.json
 scripts/spreadsheet-batch-updates.json
+
+# Session/credential material — must never be committed.
+# The default session dir is ~/.config/amazon-kdp-skill (outside the repo);
+# these patterns are belt-and-braces for legacy in-repo paths.
+.kdp-session
+*storage-state*.json
+*storage_state*.json
+amazon-kdp.json
+tmp/

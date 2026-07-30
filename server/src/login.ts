@@ -1,6 +1,6 @@
-import { chromium } from 'playwright'
 import { KDP_ROYALTIES_PAGE } from './config.js'
-import { ensureSessionDir, sessionFilePath } from './session.js'
+import { hasDisplay, launchKdpBrowser, NoDisplayError } from './browserLaunch.js'
+import { ensureSessionDir, secureSessionFile, sessionFilePath } from './session.js'
 import { checkSession } from './kdpClient.js'
 
 let loginInProgress = false
@@ -13,23 +13,32 @@ export function getLoginState(): {
   return { loginInProgress, loginError }
 }
 
-/** Open a visible browser so the user can sign in to Amazon KDP (incl. MFA). */
+/**
+ * Open a visible browser so the user can sign in to Amazon KDP (incl. MFA).
+ *
+ * Throws synchronously on a display-less host (VPS, container, CI) instead of
+ * spinning for ten minutes against a window that can never appear. The message
+ * points at the storage_state import path in docs/HEADLESS-LOGIN.md.
+ */
 export async function startInteractiveLogin(): Promise<void> {
   if (loginInProgress) {
     throw new Error('Login already in progress.')
+  }
+  if (!hasDisplay()) {
+    // Also record it on the polled state, so a client that only reads
+    // getLoginState() still learns why nothing happened.
+    loginError = new NoDisplayError().message
+    throw new NoDisplayError()
   }
 
   loginInProgress = true
   loginError = null
 
   void (async () => {
-    let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null
+    let browser: Awaited<ReturnType<typeof launchKdpBrowser>> | null = null
     try {
       await ensureSessionDir()
-      browser = await chromium.launch({
-        headless: false,
-        args: ['--disable-blink-features=AutomationControlled'],
-      })
+      browser = await launchKdpBrowser({ headless: false })
       const context = await browser.newContext()
       const page = await context.newPage()
       await page.goto(KDP_ROYALTIES_PAGE, { waitUntil: 'domcontentloaded' })
@@ -45,6 +54,7 @@ export async function startInteractiveLogin(): Promise<void> {
           const html = await page.content()
           if (html.includes('csrftoken":{"token":"')) {
             await context.storageState({ path: sessionFilePath() })
+            await secureSessionFile()
             loginError = null
             break
           }

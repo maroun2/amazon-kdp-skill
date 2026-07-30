@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -35,9 +37,25 @@ export const KDP_REQUEST_DELAY_MAX_MS = Math.max(
   rawMax,
 )
 
-/** Directory for Playwright storage state (Amazon session cookies). */
-export const SESSION_DIR =
-  process.env.KDP_SESSION_DIR || path.join(repoRoot, '.kdp-session')
+/**
+ * Directory for Playwright storage state (Amazon session cookies).
+ * Defaults outside the repo so a live Amazon session is never one bad glob away
+ * from a commit. Legacy in-repo `.kdp-session/` is still honoured if present.
+ */
+export const SESSION_DIR = resolveSessionDir()
+
+function resolveSessionDir(): string {
+  const explicit = process.env.KDP_SESSION_DIR
+  if (explicit && explicit.trim() !== '') return path.resolve(explicit)
+
+  const legacy = path.join(repoRoot, '.kdp-session')
+  if (fs.existsSync(path.join(legacy, 'amazon-kdp.json'))) return legacy
+
+  return path.join(
+    process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'),
+    'amazon-kdp-skill',
+  )
+}
 
 export const SESSION_FILE = path.join(SESSION_DIR, 'amazon-kdp.json')
 

@@ -3,10 +3,11 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+import { launchKdpBrowser } from '../server/src/browserLaunch.js'
+import { sessionFilePath } from './lib/sessionPaths.mjs'
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
-const sessionFile = path.join(repoRoot, '.kdp-session', 'amazon-kdp.json')
+const sessionFile = sessionFilePath()
 
 const ENDPOINTS = [
   'https://kdpreports.amazon.com/metadata/reports/reportsMetadata',
@@ -37,7 +38,7 @@ async function probe(page, url, init = {}) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true })
+  const browser = await launchKdpBrowser({ headless: true })
   const context = await browser.newContext({ storageState: sessionFile })
   const page = await context.newPage()
   await page.goto('https://kdpreports.amazon.com/reports/royalties', {
