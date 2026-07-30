@@ -39,6 +39,10 @@ export const SESSION_DIR =
 
 export const SESSION_FILE = path.join(SESSION_DIR, 'amazon-kdp.json')
 
+/** One-shot approval tickets for irreversible KDP operations. */
+export const APPROVALS_FILE =
+  process.env.KDP_APPROVALS_FILE || path.join(SESSION_DIR, 'approvals.json')
+
 export const KDP_REPORTS_ORIGIN = 'https://kdpreports.amazon.com'
 
 export const KDP_ROYALTIES_PAGE = `${KDP_REPORTS_ORIGIN}/reports/royalties`

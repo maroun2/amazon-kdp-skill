@@ -52,6 +52,11 @@ import {
   originGuard,
   tokenGuard,
 } from './httpAuth.js'
+import {
+  ApprovalRequiredError,
+  consumeApproval,
+  type ApprovalAction,
+} from './approvals.js'
 import { readRecoveryLearnings } from './kdpRecoveryStore.js'
 
 const app = express()
@@ -230,7 +235,7 @@ app.post('/api/kdp/metadata/update/batch', async (req, res) => {
       }
       parsed.push(result)
     }
-    res.json(await updateBookMetadataBatch(parsed, { dryRun: dryRun === true }))
+    res.json(await updateBookMetadataBatch(parsed, { dryRun: dryRun !== false }))
   } catch (e) {
     handleKdpError(res, e, 'Batch metadata update failed.')
   }
@@ -272,7 +277,7 @@ app.post('/api/kdp/pricing/update/batch', async (req, res) => {
       }
       parsed.push(result)
     }
-    res.json(await updateBookPricingBatch(parsed, { dryRun: dryRun === true }))
+    res.json(await updateBookPricingBatch(parsed, { dryRun: dryRun !== false }))
   } catch (e) {
     handleKdpError(res, e, 'Batch pricing update failed.')
   }
@@ -302,7 +307,7 @@ app.post('/api/kdp/content/upload', async (req, res) => {
     }
     res.json(
       await uploadBookContent(titleId, fmt, fileType, filePath, {
-        dryRun: dryRun === true,
+        dryRun: dryRun !== false,
       }),
     )
   } catch (e) {
@@ -347,7 +352,7 @@ app.post('/api/kdp/content/upload/batch', async (req, res) => {
         filePath: item.filePath,
       })
     }
-    res.json(await uploadBookContentBatch(parsed, { dryRun: dryRun === true }))
+    res.json(await uploadBookContentBatch(parsed, { dryRun: dryRun !== false }))
   } catch (e) {
     handleKdpError(res, e, 'Batch content upload failed.')
   }
@@ -393,6 +398,11 @@ app.post('/api/kdp/publish', async (req, res) => {
       res.status(400).json({ error: parsed.error, code: 'validation' })
       return
     }
+    // A dry run changes nothing, so it needs no ticket. Going live does.
+    if (parsed.publish && !parsed.dryRun) {
+      // create=true has no titleId yet; scope the ticket to the literal "new".
+      await requireApproval(req, 'publish', parsed.titleId || 'new', parsed.format)
+    }
     res.json(await publishBook(parsed))
   } catch (e) {
     handleKdpError(res, e, 'Publish flow failed.')
@@ -407,6 +417,7 @@ app.post('/api/kdp/titles/unpublish', async (req, res) => {
       res.status(400).json({ error: 'titleId and format are required.', code: 'validation' })
       return
     }
+    await requireApproval(req, 'unpublish', titleId, fmt)
     res.json(await unpublishTitle(titleId, fmt))
   } catch (e) {
     handleKdpError(res, e, 'Unpublish failed.')
@@ -421,6 +432,7 @@ app.post('/api/kdp/titles/delete', async (req, res) => {
       res.status(400).json({ error: 'titleId and format are required.', code: 'validation' })
       return
     }
+    await requireApproval(req, 'delete', titleId, fmt)
     res.json(await deleteTitle(titleId, fmt))
   } catch (e) {
     handleKdpError(res, e, 'Delete failed.')
@@ -435,6 +447,7 @@ app.post('/api/kdp/titles/archive', async (req, res) => {
       res.status(400).json({ error: 'titleId and format are required.', code: 'validation' })
       return
     }
+    await requireApproval(req, 'archive', titleId, fmt)
     res.json(await archiveTitle(titleId, fmt))
   } catch (e) {
     handleKdpError(res, e, 'Archive failed.')
@@ -575,7 +588,7 @@ function parseUpdateBody(body: unknown):
   }
   const changes = parseMetadataChanges(raw.changes ?? raw)
   if (!changes) return { error: 'At least one metadata change is required.' }
-  return { titleId, format, changes, dryRun: raw.dryRun === true }
+  return { titleId, format, changes, dryRun: raw.dryRun !== false }
 }
 
 function parsePricingUpdateBody(body: unknown):
@@ -589,7 +602,7 @@ function parsePricingUpdateBody(body: unknown):
   }
   const changes = parsePricingChanges(raw.changes ?? raw)
   if (!changes) return { error: 'At least one pricing change is required.' }
-  return { titleId, format, changes, dryRun: raw.dryRun === true }
+  return { titleId, format, changes, dryRun: raw.dryRun !== false }
 }
 
 function parseCategorySpec(raw: unknown): KdpCategorySpec | null {
@@ -646,7 +659,7 @@ function parsePublishBody(body: unknown): PublishBookRequest | { error: string }
 
   const request: PublishBookRequest = {
     format,
-    dryRun: raw.dryRun === true,
+    dryRun: raw.dryRun !== false,
     publish: raw.publish === true,
     create: raw.create === true,
   }
@@ -687,7 +700,32 @@ function parsePublishBody(body: unknown): PublishBookRequest | { error: string }
   return request
 }
 
+/**
+ * Consume a one-shot approval ticket for an irreversible operation, or throw.
+ * Enforced here, in code, on the request path — not asked for in a prompt.
+ */
+async function requireApproval(
+  req: express.Request,
+  action: ApprovalAction,
+  titleId: string,
+  format: string,
+): Promise<void> {
+  const approval = (req.body as { approval?: unknown } | undefined)?.approval
+  await consumeApproval({ action, titleId, format, token: approval })
+}
+
 function handleKdpError(res: express.Response, e: unknown, fallback: string): void {
+  if (e instanceof ApprovalRequiredError) {
+    res.status(403).json({
+      error: e.message,
+      code: e.code,
+      action: e.action,
+      titleId: e.titleId,
+      format: e.format,
+      remedy: `npm run approve -- ${e.action} ${e.titleId} ${e.format}`,
+    })
+    return
+  }
   if (e instanceof KdpAuthError) {
     res.status(401).json({ error: e.message, code: 'auth' })
     return
@@ -717,4 +755,5 @@ app.listen(PORT, BIND_HOST, () => {
       ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS.join(', ') : 'refused'
     }`,
   )
+  console.log('  publish/unpublish/delete/archive: approval ticket required')
 })
