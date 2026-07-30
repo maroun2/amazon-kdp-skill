@@ -8,6 +8,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const API = (process.env.KDP_API_URL || 'http://localhost:3001').replace(/\/$/, '')
+
+/** Server requires this when KDP_API_TOKEN is set; harmless when it is not. */
+const AUTH_HEADERS = process.env.KDP_API_TOKEN
+  ? { Authorization: `Bearer ${process.env.KDP_API_TOKEN}` }
+  : {}
+
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 // Override with env vars for local e2e runs against your own KDP account.
@@ -108,7 +114,7 @@ async function main() {
     await test('metadata update dry-run (details)', async () => {
       const d = await json('/api/kdp/metadata/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({
           titleId: PAPERBACK.titleId,
           format: PAPERBACK.format,
@@ -125,7 +131,7 @@ async function main() {
     await test('pricing update dry-run (paperback)', async () => {
       const d = await json('/api/kdp/pricing/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({
           titleId: PAPERBACK.titleId,
           format: 'paperback',
@@ -139,7 +145,7 @@ async function main() {
     await test('pricing update dry-run (kindle KDP Select)', async () => {
       const d = await json('/api/kdp/pricing/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({
           titleId: KINDLE.titleId,
           format: 'kindle',
@@ -153,7 +159,7 @@ async function main() {
     await test('content upload dry-run (interior)', async () => {
       const d = await json('/api/kdp/content/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({
           titleId: PAPERBACK.titleId,
           format: 'paperback',
@@ -168,7 +174,7 @@ async function main() {
     await test('content upload dry-run (cover)', async () => {
       const d = await json('/api/kdp/content/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({
           titleId: PAPERBACK.titleId,
           format: 'paperback',
@@ -183,7 +189,7 @@ async function main() {
     await test('categories update dry-run (browse nodes)', async () => {
       const d = await json('/api/kdp/categories/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({
           titleId: PAPERBACK.titleId,
           format: 'paperback',
@@ -197,7 +203,7 @@ async function main() {
     await test('publish wizard dry-run (existing title)', async () => {
       const d = await json('/api/kdp/publish', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({
           format: 'paperback',
           titleId: PAPERBACK.titleId,
@@ -217,7 +223,7 @@ async function main() {
     await test('download date-range report', async () => {
       const res = await fetch(`${API}/api/kdp/reports/download`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({ startMonth: '2026-05', endMonth: '2026-06' }),
       })
       if (!res.ok) {

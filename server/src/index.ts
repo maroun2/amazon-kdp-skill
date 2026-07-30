@@ -45,12 +45,23 @@ import {
   type KdpBookFormat,
 } from './metadataStore.js'
 import { readSessionMeta, removeSession } from './session.js'
-import { PORT } from './config.js'
+import { ALLOWED_ORIGINS, API_TOKEN, BIND_HOST, PORT } from './config.js'
+import {
+  assertSafeBindConfig,
+  isLoopbackBind,
+  originGuard,
+  tokenGuard,
+} from './httpAuth.js'
 import { readRecoveryLearnings } from './kdpRecoveryStore.js'
 
 const app = express()
 
-app.use(cors({ origin: true, credentials: true }))
+// An empty allowlist means no cross-origin access at all, which is the default.
+// `origin: true` upstream reflected whatever the caller sent, so any page the
+// operator had open could drive this API with credentials attached.
+app.use(cors({ origin: ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS : false, credentials: true }))
+app.use(originGuard())
+app.use(tokenGuard())
 app.use(express.json())
 
 app.get('/api/kdp/health', (_req, res) => {
@@ -691,6 +702,19 @@ function handleKdpError(res: express.Response, e: unknown, fallback: string): vo
   })
 }
 
-app.listen(PORT, () => {
-  console.log(`KDP sync server listening on http://localhost:${PORT}`)
+assertSafeBindConfig()
+
+app.listen(PORT, BIND_HOST, () => {
+  console.log(`KDP sync server listening on http://${BIND_HOST}:${PORT}`)
+  console.log(
+    isLoopbackBind(BIND_HOST)
+      ? '  bind: loopback only'
+      : `  bind: ${BIND_HOST} — REACHABLE FROM THE NETWORK`,
+  )
+  console.log(`  api token: ${API_TOKEN ? 'required' : 'not set'}`)
+  console.log(
+    `  cross-origin: ${
+      ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS.join(', ') : 'refused'
+    }`,
+  )
 })

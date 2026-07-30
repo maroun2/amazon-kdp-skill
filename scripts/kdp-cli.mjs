@@ -7,10 +7,19 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const API_BASE = (process.env.KDP_API_URL || 'http://localhost:3001').replace(/\/$/, '')
+
+/** Server requires this when KDP_API_TOKEN is set; harmless when it is not. */
+const AUTH_HEADERS = process.env.KDP_API_TOKEN
+  ? { Authorization: `Bearer ${process.env.KDP_API_TOKEN}` }
+  : {}
+
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 async function api(pathname, options = {}) {
-  const res = await fetch(`${API_BASE}${pathname}`, options)
+  const res = await fetch(`${API_BASE}${pathname}`, {
+    ...options,
+    headers: { ...AUTH_HEADERS, ...(options.headers ?? {}) },
+  })
   const contentType = res.headers.get('content-type') || ''
   if (contentType.includes('application/json')) {
     const data = await res.json()
@@ -89,7 +98,7 @@ async function main() {
     const endpoint = startMonth || endMonth ? '/api/kdp/reports/download' : '/api/kdp/sync'
     const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: startMonth || endMonth ? JSON.stringify({ startMonth, endMonth }) : undefined,
     })
     if (!res.ok) {
@@ -157,7 +166,7 @@ async function main() {
       JSON.stringify(
         await api('/api/kdp/titles/create', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
           body: JSON.stringify({ format }),
         }),
         null,
@@ -171,15 +180,16 @@ async function main() {
     const titleId = process.argv[3]
     const format = process.argv[4]
     if (!titleId || !format) {
-      console.error('Usage: title-delete TITLE_ID FORMAT')
+      console.error('Usage: title-delete TITLE_ID FORMAT --approval TOKEN')
+      console.error('Mint a token with: npm run approve -- delete TITLE_ID FORMAT')
       process.exit(1)
     }
     console.log(
       JSON.stringify(
         await api('/api/kdp/titles/delete', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ titleId, format }),
+          headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
+          body: JSON.stringify({ titleId, format, approval: argValue('--approval') }),
         }),
         null,
         2,
@@ -192,15 +202,16 @@ async function main() {
     const titleId = process.argv[3]
     const format = process.argv[4]
     if (!titleId || !format) {
-      console.error('Usage: title-unpublish TITLE_ID FORMAT')
+      console.error('Usage: title-unpublish TITLE_ID FORMAT --approval TOKEN')
+      console.error('Mint a token with: npm run approve -- unpublish TITLE_ID FORMAT')
       process.exit(1)
     }
     console.log(
       JSON.stringify(
         await api('/api/kdp/titles/unpublish', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ titleId, format }),
+          headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
+          body: JSON.stringify({ titleId, format, approval: argValue('--approval') }),
         }),
         null,
         2,
@@ -220,7 +231,7 @@ async function main() {
       JSON.stringify(
         await api('/api/kdp/publish', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
           body: JSON.stringify(spec),
         }),
         null,
