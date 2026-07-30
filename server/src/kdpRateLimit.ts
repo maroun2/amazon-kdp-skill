@@ -1,18 +1,37 @@
-import { KDP_REQUEST_DELAY_MS } from './config.js'
+import {
+  KDP_REQUEST_DELAY_MAX_MS,
+  KDP_REQUEST_DELAY_MIN_MS,
+} from './config.js'
 
 let lastRequestAt = 0
 
-/** Minimum gap between outbound KDP page loads and API calls (ms). */
-export function getKdpRequestDelayMs(): number {
-  return KDP_REQUEST_DELAY_MS
+/** Configured throttle window (ms) between outbound KDP requests. */
+export function getKdpRequestDelayRangeMs(): { minMs: number; maxMs: number } {
+  return { minMs: KDP_REQUEST_DELAY_MIN_MS, maxMs: KDP_REQUEST_DELAY_MAX_MS }
 }
 
 /**
- * Wait until at least KDP_REQUEST_DELAY_MS has passed since the last KDP request.
- * Call before every page.goto, fetch, and page.request to Amazon KDP domains.
+ * Back-compat shim: the throttle is a random window now, so there is no single
+ * delay. Returns the minimum — the floor every gap is guaranteed to clear.
+ */
+export function getKdpRequestDelayMs(): number {
+  return KDP_REQUEST_DELAY_MIN_MS
+}
+
+/** Uniform draw from [min, max]. */
+export function nextKdpDelayMs(): number {
+  const { minMs, maxMs } = getKdpRequestDelayRangeMs()
+  if (maxMs <= minMs) return minMs
+  return minMs + Math.floor(Math.random() * (maxMs - minMs + 1))
+}
+
+/**
+ * Wait until a freshly drawn delay (4-10s by default) has passed since the last
+ * KDP request. Call before every page.goto, fetch, and page.request to Amazon
+ * KDP domains.
  */
 export async function kdpThrottle(): Promise<void> {
-  const delayMs = KDP_REQUEST_DELAY_MS
+  const delayMs = nextKdpDelayMs()
   if (delayMs <= 0) return
 
   const now = Date.now()
