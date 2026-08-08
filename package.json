@@ -23,6 +23,7 @@
     "update:metadata": "node scripts/update-kdp-metadata.mjs",
     "publish:book": "node scripts/publish-book.mjs",
     "uploader:to-publish": "tsx scripts/kdp-uploader-to-publish.ts",
+    "approve": "tsx scripts/kdp-approve.ts",
     "title:create": "node scripts/kdp-cli.mjs title-create",
     "title:delete": "node scripts/kdp-cli.mjs title-delete",
     "title:unpublish": "node scripts/kdp-cli.mjs title-unpublish",

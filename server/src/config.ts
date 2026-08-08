@@ -6,6 +6,26 @@ const repoRoot = path.resolve(__dirname, '../..')
 
 export const PORT = Number(process.env.KDP_SERVER_PORT || 3001)
 
+/**
+ * Interface to listen on. Loopback by default: this server can publish and
+ * delete books on a live Amazon account, so it must not be reachable from the
+ * network unless someone deliberately says otherwise (and sets a token).
+ */
+export const BIND_HOST = process.env.KDP_BIND_HOST || '127.0.0.1'
+
+/** Shared secret required on every request when set. Empty = no token check. */
+export const API_TOKEN = (process.env.KDP_API_TOKEN || '').trim()
+
+/**
+ * Browser origins allowed to call this API. Empty by default — the clients are
+ * server-side (the CLI uses fetch from Node and sends no Origin), so nothing
+ * legitimate needs cross-origin access.
+ */
+export const ALLOWED_ORIGINS = (process.env.KDP_CORS_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+
 /** Minimum gap between KDP page loads and API calls. Supports legacy KDP_UPDATE_DELAY_MS. */
 export const KDP_REQUEST_DELAY_MS = Number(
   process.env.KDP_REQUEST_DELAY_MS ||
@@ -18,6 +38,10 @@ export const SESSION_DIR =
   process.env.KDP_SESSION_DIR || path.join(repoRoot, '.kdp-session')
 
 export const SESSION_FILE = path.join(SESSION_DIR, 'amazon-kdp.json')
+
+/** One-shot approval tickets for irreversible KDP operations. */
+export const APPROVALS_FILE =
+  process.env.KDP_APPROVALS_FILE || path.join(SESSION_DIR, 'approvals.json')
 
 export const KDP_REPORTS_ORIGIN = 'https://kdpreports.amazon.com'
 

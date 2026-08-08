@@ -87,6 +87,12 @@ Check `references/troubleshooting.md` before reporting browser automation failur
 - **Never commit** `.kdp-session/` — it contains Amazon session cookies
 - **Never commit** `.env`, downloaded `.xlsx` files, or `output/`
 - All automation is local; no data is sent to third parties
+- The server binds **loopback only** and refuses to start on a reachable interface without `KDP_API_TOKEN`
+- Cross-origin browser requests are **refused** unless you allowlist them in `KDP_CORS_ORIGINS`
+- `dryRun` defaults to **true** — a live write must ask for it explicitly
+- Publish, unpublish, delete and archive require a one-shot approval ticket: `npm run approve -- delete TITLE_ID FORMAT`
+
+Details, rationale and the exact guarantees: [docs/SECURITY-HARDENING.md](docs/SECURITY-HARDENING.md)
 
 ## Repo layout
 

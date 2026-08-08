@@ -9,6 +9,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const API_BASE = (process.env.KDP_API_URL || 'http://localhost:3001').replace(/\/$/, '')
+
+/** Server requires this when KDP_API_TOKEN is set; harmless when it is not. */
+const AUTH_HEADERS = process.env.KDP_API_TOKEN
+  ? { Authorization: `Bearer ${process.env.KDP_API_TOKEN}` }
+  : {}
+
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PUBLISH_TIMEOUT_MS = 1_200_000
 
