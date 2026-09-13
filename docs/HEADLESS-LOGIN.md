@@ -1,7 +1,18 @@
 # Signing in on a machine with no display
 
 `npm run login` opens a real Chromium window so you can complete Amazon sign-in and MFA
-by hand. On a VPS, a container or CI there is no display, so that path cannot work. The
+by hand. On a VPS, a container or CI there is no physical display. This repo can use
+the general `remote-gui` skill to provide a temporary authenticated browser desktop:
+
+```bash
+npm run login:remote
+```
+
+Agent sends returned URL and password to user. URL expires after ten minutes if
+unopened. First disconnect removes remote access; successful login is saved to
+`~/.config/amazon-kdp-skill/amazon-kdp.json` before remaining display processes exit.
+
+Plain `npm run login` still detects a missing display. That
 server now detects this and refuses immediately with an actionable error instead of
 spinning for ten minutes:
 
@@ -14,7 +25,7 @@ Detection is `DISPLAY` / `WAYLAND_DISPLAY` on Linux — `server/src/browserLaunc
 (`hasDisplay`). It is checked before the browser launches, in
 `server/src/login.ts` (`startInteractiveLogin`).
 
-The supported alternative: **sign in on a machine that does have a browser, export the
+Fallback alternative: **sign in on a machine that does have a browser, export the
 session, and import it here.** The session is a Playwright `storage_state` file — exactly
 what `npm run login` would have produced — so nothing else in the codebase changes.
 

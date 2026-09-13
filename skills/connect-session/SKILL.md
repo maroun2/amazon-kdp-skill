@@ -31,15 +31,22 @@ npm run status
 
 Session saved to `~/.config/amazon-kdp-skill/amazon-kdp.json` (mode 0600).
 
-## Sign in (headless machine — no display)
+## Sign in (headless VPS — temporary remote desktop)
 
-`npm run login` fails fast here with `code: no_display`. There is no way to complete
-Amazon sign-in on this machine; do **not** retry, and do not ask the user to run it again.
+`npm run login` fails fast here with `code: no_display`; do not retry it. When
+`remote-gui` is installed, use:
 
-1. **Tell the user** to capture the session on a machine that has a browser, following
-   `docs/HEADLESS-LOGIN.md`, and copy the file over.
-2. Agent runs: `npm run session:import -- <path-to-storage-state.json>`
-3. Agent runs: `npm run session:verify`
+1. Agent runs `npm run login:remote`.
+2. Send returned `url` and `password` to user.
+3. User signs in and completes MFA, waits for KDP to load, then closes tab.
+4. Agent polls `npm run session:verify` until valid.
+
+Desktop link expires after ten minutes if unopened. First disconnect removes
+remote access; login worker retains same browser long enough to save Playwright
+storage state, then all display processes stop.
+
+If remote GUI is unavailable, use storage-state capture/import from
+`docs/HEADLESS-LOGIN.md`.
 
 Never print, echo, or paste the contents of the storage-state file.
 

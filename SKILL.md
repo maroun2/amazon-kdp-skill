@@ -16,7 +16,7 @@ Self-contained skill repo with a local Express + Playwright server. Amazon has *
 2. **Start the server** if not running: `npm run server:start` (background).
 3. **Check session** before any sync/update/download: `npm run status`.
 4. **Run all KDP tasks yourself** via npm scripts or the local REST API.
-5. **Only pause for the user** during Amazon login — they must complete sign-in (incl. MFA) in the visible Chromium window. Poll `npm run status` until `connected: true`. On a headless host `npm run login` fails with `code: no_display` — do not retry it; use the storage-state import path in `docs/HEADLESS-LOGIN.md`.
+5. **Only pause for the user** during Amazon login — they must complete sign-in (incl. MFA) in visible Chromium. On this headless VPS run `npm run login:remote`, send returned noVNC URL/password, then poll session verification. Use `docs/HEADLESS-LOGIN.md` import only as fallback.
 
 Session persists in `.kdp-session/` (gitignored).
 

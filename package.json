@@ -8,6 +8,7 @@
     "server": "tsx watch server/src/index.ts",
     "server:start": "tsx server/src/index.ts",
     "login": "node scripts/kdp-cli.mjs login",
+    "login:remote": "tsx scripts/remote-login.ts",
     "session:import": "node scripts/session-import.mjs",
     "session:verify": "tsx scripts/session-verify.ts",
     "browser:check": "tsx scripts/browser-check.ts",
