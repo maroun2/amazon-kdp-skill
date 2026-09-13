@@ -37,7 +37,7 @@ Session saved to `~/.config/amazon-kdp-skill/amazon-kdp.json` (mode 0600).
 `remote-gui` is installed, use:
 
 1. Agent runs `npm run login:remote`.
-2. Send returned `url` and `password` to user.
+2. Send returned secret `url` to user; password is carried only in URL fragment.
 3. User signs in and completes MFA, waits for KDP to load, then closes tab.
 4. Agent polls `npm run session:verify` until valid.
 

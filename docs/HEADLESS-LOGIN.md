@@ -8,7 +8,8 @@ the general `remote-gui` skill to provide a temporary authenticated browser desk
 npm run login:remote
 ```
 
-Agent sends returned URL and password to user. URL expires after ten minutes if
+Agent sends returned secret URL to user; VNC password is embedded in URL fragment
+and never reaches HTTP logs. URL expires after ten minutes if
 unopened. First disconnect removes remote access; successful login is saved to
 `~/.config/amazon-kdp-skill/amazon-kdp.json` before remaining display processes exit.
 

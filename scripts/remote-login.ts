@@ -31,7 +31,7 @@ function launcher(): void {
   const session = JSON.parse(run.stdout)
   console.log(JSON.stringify({
     ...session,
-    instruction: 'Open URL, enter password, then finish Amazon sign-in and MFA. Close tab when KDP loads.',
+    instruction: 'Open secret URL, then finish Amazon sign-in and MFA. Close tab when KDP loads.',
   }, null, 2))
 }
 
