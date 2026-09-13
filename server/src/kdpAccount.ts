@@ -5,7 +5,7 @@ import { kdpGoto } from './kdpHttp.js'
 import { fetchReportsMetadata } from './kdpReportsApi.js'
 import { KDP_API, KDP_ROYALTIES_PAGE } from './config.js'
 import { sessionExists, sessionFilePath } from './session.js'
-import { chromium } from 'playwright'
+import { launchKdpBrowser } from './browserLaunch.js'
 
 export type KdpAccountInfo = {
   accountCreationDate: string
@@ -32,10 +32,7 @@ async function withReportsPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
     throw new KdpAuthError()
   }
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--disable-blink-features=AutomationControlled'],
-  })
+  const browser = await launchKdpBrowser({ headless: true })
 
   try {
     const context = await browser.newContext({ storageState: sessionFilePath() })

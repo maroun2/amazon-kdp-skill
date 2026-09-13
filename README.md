@@ -18,7 +18,7 @@ This skill fills that gap. A local Playwright server drives KDP the same way you
 - Update listings, prices, KDP Select, and content files (Buggy still in development)
 - Run the full publish wizard from draft to live (Buggy still in development)
 
-Everything runs on your machine. Session cookies stay in `.kdp-session/` and are never sent anywhere else.
+Everything runs on your machine. Session cookies stay in `~/.config/amazon-kdp-skill/` (mode 0600, outside the repo) and are never sent anywhere else.
 
 ## Quick start
 
@@ -58,14 +58,43 @@ See `skills/` for task-specific agent instructions and `references/` for API sha
 ```
 You  →  Agent (Cursor / Claude)  →  npm scripts / REST API  →  Playwright  →  KDP
                                               ↓
-                                    .kdp-session/ (local cookies + cache)
+                          ~/.config/amazon-kdp-skill/ (cookies + cache, 0700/0600)
 ```
 
 - **Setup:** The skill installs dependencies, starts the local server, and manages the session
 - **Server:** Express on `http://localhost:3001`
-- **Throttling:** 4s delay between KDP requests (configurable via `.env`)
-- **Cache:** Scraped metadata stored locally in `.kdp-session/`
-- **Recovery learnings:** Successful KDP error workarounds stored in `.kdp-session/recovery-learnings.json`
+- **Throttling:** random **4-10s** delay before every KDP request — `KDP_REQUEST_DELAY_MIN_MS` / `KDP_REQUEST_DELAY_MAX_MS` in `.env`
+- **Browser:** no Chromium is downloaded on install; an existing one is located at launch — see [docs/RESOURCES.md](docs/RESOURCES.md)
+- **Cache:** scraped metadata stored in the session dir
+- **Recovery learnings:** successful KDP error workarounds stored in `recovery-learnings.json` in the session dir
+
+## Headless / no-display machines
+
+`npm run login` needs a visible browser. On a VPS, container or CI there is none, and the
+server now says so immediately instead of hanging. Capture the session on a machine that
+has a browser and import it:
+
+```bash
+npm run session:import -- /tmp/kdp-storage-state.json   # installs at 0600, outside the repo
+npm run session:verify                                  # confirms it loaded and works
+npm run browser:check                                   # confirms Chromium, no Amazon traffic
+```
+
+Full instructions, cookie list, expiry behaviour and the re-auth signal:
+[docs/HEADLESS-LOGIN.md](docs/HEADLESS-LOGIN.md).
+
+## Resource footprint
+
+Measured on NixOS / Node 22 / Playwright 1.61 — full numbers and method in
+[docs/RESOURCES.md](docs/RESOURCES.md).
+
+| | |
+| --- | --- |
+| Repo working tree | 574 KB |
+| `node_modules` (prod / with dev) | 34 MB / 71 MB |
+| Chromium binary | 260-376 MB — **not downloaded by this repo**, an existing one is reused |
+| RAM, peak (node + Chromium, 2 pages) | ~571 MB light, ~945 MB on a heavy page |
+| Background processes | none — no daemon, no cron, no systemd unit |
 
 ## Contributing
 
@@ -84,9 +113,10 @@ Check `references/troubleshooting.md` before reporting browser automation failur
 
 ## Security
 
-- **Never commit** `.kdp-session/` — it contains Amazon session cookies
+- Session cookies live **outside the repo** by default (`~/.config/amazon-kdp-skill/`, dir 0700, file 0600). Never commit them, wherever they are — `.kdp-session/` and `*storage_state*.json` are gitignored
 - **Never commit** `.env`, downloaded `.xlsx` files, or `output/`
 - All automation is local; no data is sent to third parties
+- This fork carries a security audit of the upstream code: [AUDIT.md](AUDIT.md). Read the HIGH findings before pointing it at a live account — the control server is unauthenticated and publish/delete have no code-enforced approval gate
 
 ## Repo layout
 
@@ -98,5 +128,7 @@ amazon-kdp-skill/
 ├── lib/               # Royalty xlsx parser
 ├── scripts/           # CLI wrappers
 ├── references/        # API docs + troubleshooting
+├── docs/              # Headless login + resource footprint
+├── AUDIT.md           # Security audit of this codebase
 └── examples/          # Sample publish/update specs
 ```

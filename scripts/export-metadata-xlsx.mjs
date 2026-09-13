@@ -8,10 +8,11 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { sessionDir } from './lib/sessionPaths.mjs'
 import XLSX from 'xlsx'
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const cachePath = path.join(repoRoot, '.kdp-session', 'book-metadata.json')
+const cachePath = path.join(sessionDir(), 'book-metadata.json')
 
 const BASE_COLUMNS = [
   'titleId',

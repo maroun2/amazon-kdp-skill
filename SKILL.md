@@ -16,7 +16,7 @@ Self-contained skill repo with a local Express + Playwright server. Amazon has *
 2. **Start the server** if not running: `npm run server:start` (background).
 3. **Check session** before any sync/update/download: `npm run status`.
 4. **Run all KDP tasks yourself** via npm scripts or the local REST API.
-5. **Only pause for the user** during Amazon login — they must complete sign-in (incl. MFA) in the visible Chromium window. Poll `npm run status` until `connected: true`.
+5. **Only pause for the user** during Amazon login — they must complete sign-in (incl. MFA) in visible Chromium. On this headless VPS run `npm run login:remote`, send returned noVNC URL/password, then poll session verification. Use `docs/HEADLESS-LOGIN.md` import only as fallback.
 
 Session persists in `.kdp-session/` (gitignored).
 
@@ -84,7 +84,7 @@ Playwright session cookies
         ↓
 Request-first: kdpreports JSON APIs → HTML GET + parse → browser fallback
         ↓
-Global rate limit (KDP_REQUEST_DELAY_MS between every request)
+Global rate limit (random 4-10s before every request)
 ```
 
 ## Read operations
@@ -139,7 +139,7 @@ If recovery exhausts retries, read `errors` and `recoveryLog`, then fix the unde
 1. **Always check session** (`npm run status`) before sync/update. If `connected: false`, run login sub-skill first.
 2. **One operation at a time** for writes — see [Sequential operations](#sequential-operations-required). No batch scripts, no parallel publishes, no `/batch` API for multiple titles.
 3. **Never commit** `.kdp-session/` or downloaded `.xlsx` files.
-4. **Rate limiting**: the server spaces every KDP page load and API call by `KDP_REQUEST_DELAY_MS` (default 4s). Do not bypass this.
+4. **Rate limiting**: the server waits a random 4-10s before every KDP page load and API call (`KDP_REQUEST_DELAY_MIN_MS` / `KDP_REQUEST_DELAY_MAX_MS`). Do not bypass this.
 5. **Metadata/pricing updates**: dry-run one book, then apply live changes **one book per request**.
 6. **Verify saves** by re-reading metadata from KDP (built into update flows).
 7. **Categories**: writable via browse node IDs or modal path picker (`POST /api/kdp/categories/update` or publish wizard).

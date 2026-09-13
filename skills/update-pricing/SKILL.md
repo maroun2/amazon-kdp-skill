@@ -50,4 +50,4 @@ Set `"dryRun": false` to save.
 
 ## Rate limiting
 
-Same as metadata updates — `KDP_REQUEST_DELAY_MS` (default 4s) between every KDP request.
+Same as metadata updates — a random 4-10s wait before every KDP request (`KDP_REQUEST_DELAY_MIN_MS` / `KDP_REQUEST_DELAY_MAX_MS`).

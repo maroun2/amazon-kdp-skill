@@ -38,6 +38,7 @@ import {
   updateBookPricingBatch,
 } from './kdpPricingUpdate.js'
 import { getLoginState, startInteractiveLogin } from './login.js'
+import { NoDisplayError } from './browserLaunch.js'
 import {
   METADATA_CACHE_VERSION,
   readMetadataCache,
@@ -99,6 +100,17 @@ app.post('/api/kdp/login/start', async (_req, res) => {
     await startInteractiveLogin()
     res.json({ started: true })
   } catch (e) {
+    if (e instanceof NoDisplayError) {
+      // 412: the host can never satisfy this. Clients must not retry — they
+      // must import a storage_state file instead (docs/HEADLESS-LOGIN.md).
+      res.status(412).json({
+        error: e.message,
+        code: e.code,
+        remedy: 'npm run session:import -- <storage-state.json>',
+        docs: 'docs/HEADLESS-LOGIN.md',
+      })
+      return
+    }
     res.status(400).json({
       error: e instanceof Error ? e.message : 'Could not start login.',
     })

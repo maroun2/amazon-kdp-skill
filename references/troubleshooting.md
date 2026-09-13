@@ -12,7 +12,7 @@ npm run status   # wait for connected: true
 Amazon rate-limits rapid page loads. Symptoms: page title "Server Busy", error `Could not find editable fields`.
 
 **Fix:**
-- Default spacing is 4s between every KDP request (`KDP_REQUEST_DELAY_MS=4000` in `.env`)
+- Default spacing is a random 4-10s before every KDP request (`KDP_REQUEST_DELAY_MIN_MS=4000` / `KDP_REQUEST_DELAY_MAX_MS=10000` in `.env`)
 - Increase to `6000` or `8000` if still blocked
 - Process **one book at a time** — wait for each operation to finish before the next
 - Wait 1–2 minutes if still blocked, then retry

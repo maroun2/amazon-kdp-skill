@@ -22,14 +22,33 @@ npm run status
 
 `connected: true` → ready. `connected: false` → start login flow below.
 
-## Sign in (agent-driven)
+## Sign in (agent-driven, machine with a display)
 
 1. Agent starts server if needed.
 2. Agent runs: `npm run login`
 3. **Tell the user** to complete Amazon sign-in in the visible Chromium window (MFA if prompted).
 4. Agent polls: `npm run status` until `connected: true`
 
-Session saved to `.kdp-session/amazon-kdp.json`.
+Session saved to `~/.config/amazon-kdp-skill/amazon-kdp.json` (mode 0600).
+
+## Sign in (headless VPS — temporary remote desktop)
+
+`npm run login` fails fast here with `code: no_display`; do not retry it. When
+`remote-gui` is installed, use:
+
+1. Agent runs `npm run login:remote`.
+2. Send returned `url` and `password` to user.
+3. User signs in and completes MFA, waits for KDP to load, then closes tab.
+4. Agent polls `npm run session:verify` until valid.
+
+Desktop link expires after ten minutes if unopened. First disconnect removes
+remote access; login worker retains same browser long enough to save Playwright
+storage state, then all display processes stop.
+
+If remote GUI is unavailable, use storage-state capture/import from
+`docs/HEADLESS-LOGIN.md`.
+
+Never print, echo, or paste the contents of the storage-state file.
 
 ## Disconnect
 
@@ -49,7 +68,8 @@ Clears session cookies and local metadata cache.
 
 ## Errors
 
-- **401 on any endpoint** → session expired; re-run login
+- **401 on any endpoint** → session expired; re-run login (or re-import on a headless machine)
+- **`code: no_display` from login** → headless host; use the import path above, do not retry
 - **Login already in progress** → wait for browser window to finish
 
 See [references/troubleshooting.md](../../references/troubleshooting.md).

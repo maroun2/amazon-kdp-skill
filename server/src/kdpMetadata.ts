@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Page } from 'playwright'
+import type { Page } from 'playwright'
+import { defaultHeadless, launchKdpBrowser } from './browserLaunch.js'
 import { KdpAuthError, KdpClientError } from './kdpClient.js'
 import { fetchAndParseKdpHtml, kdpFetchHtml, parseKdpHtml } from './kdpHtmlParse.js'
 import { kdpGoto } from './kdpHttp.js'
@@ -126,15 +127,12 @@ export async function withKdpPages<T>(
     throw new KdpAuthError()
   }
 
-  const headless = options.headless ?? process.env.KDP_HEADLESS === 'true'
+  const headless = options.headless ?? defaultHeadless()
   const viewport = options.viewport ?? { width: 1920, height: 1080 }
 
-  const browser = await chromium.launch({
+  const browser = await launchKdpBrowser({
     headless,
-    args: [
-      '--disable-blink-features=AutomationControlled',
-      ...(headless ? [] : ['--start-maximized']),
-    ],
+    args: headless ? [] : ['--start-maximized'],
   })
 
   try {
