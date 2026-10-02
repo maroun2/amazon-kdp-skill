@@ -76,3 +76,5 @@ The server waits a random **4-10 seconds** before **every** KDP page load and AP
 | POST | `/api/kdp/metadata/update/batch` |
 
 **Agents:** Use `/api/kdp/metadata/update` once per book, sequentially. Do not use the batch endpoint for multi-book agent tasks — it times out and triggers Amazon rate limits.
+
+Metadata-only edits preserve release scheduling. Saved status requires requested fields to match fresh readback; a long unsaved description or matching opening sentence does not prove save. Empty descriptions in server HTML are checked on the hydrated details form before caching.

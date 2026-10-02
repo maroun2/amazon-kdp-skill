@@ -355,7 +355,7 @@ export async function fetchBookMetadata(
   parsePage: Page,
   ref: TitleFormatRef,
 ): Promise<KdpBookMetadata | null> {
-  const details = await fetchAndParseKdpHtml<ParsedDetails>(
+  let details = await fetchAndParseKdpHtml<ParsedDetails>(
     requestPage,
     parsePage,
     setupPageUrl(ref.format, ref.titleId, 'details'),
@@ -363,6 +363,17 @@ export async function fetchBookMetadata(
   )
   if (!details) {
     return null
+  }
+
+  // Current details HTML has placeholder values populated by client scripts.
+  // An empty server-rendered description must be checked on the hydrated form.
+  if (!details.description.trim()) {
+    await kdpGoto(parsePage, setupPageUrl(ref.format, ref.titleId, 'details'), {
+      waitUntil: 'networkidle', timeout: 30_000,
+    })
+    if (/\/ap\/|signin|captcha|robotcheck/i.test(parsePage.url())) throw new KdpAuthError()
+    details = await parsePage.evaluate(`(${PARSE_DETAILS_FN})()`) as ParsedDetails
+    if (!details.title.trim()) throw new KdpClientError('KDP details form did not load; metadata was not saved.')
   }
 
   const description = stripHtml(details.description)

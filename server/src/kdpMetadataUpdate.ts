@@ -7,7 +7,7 @@ import { fetchBookMetadata, setupPageUrl, withKdpPage } from './kdpMetadata.js'
 import { kdpGoto } from './kdpHttp.js'
 import { kdpThrottle } from './kdpRateLimit.js'
 import { clickKdpActionButton } from './kdpUiHelpers.js'
-import { ensureReleaseDateScheduled, setReleaseNow } from './kdpCreateTitle.js'
+import { ensureReleaseDateScheduled } from './kdpCreateTitle.js'
 import type { KdpCategorySpec } from './kdpCategories.js'
 import { gatherBlockers, runWithRecovery, type RecoveryAttempt } from './kdpRecovery.js'
 import {
@@ -286,7 +286,8 @@ function stripHtml(html: string): string {
     .trim()
 }
 
-function changesApplied(book: KdpBookMetadata, changes: KdpMetadataChanges): boolean {
+export function changesApplied(book: KdpBookMetadata, changes: KdpMetadataChanges): boolean {
+  if (changes.largePrint !== undefined && book.largePrint !== changes.largePrint) return false
   if (changes.title !== undefined && book.title.trim() !== changes.title.trim()) {
     return false
   }
@@ -300,8 +301,7 @@ function changesApplied(book: KdpBookMetadata, changes: KdpMetadataChanges): boo
     const expected = stripHtml(changes.descriptionHtml)
     const actual = stripHtml(book.description)
     if (!expected || !actual) return false
-    const probe = expected.slice(0, Math.min(80, expected.length))
-    if (!actual.includes(probe) && !expected.includes(actual.slice(0, 80))) return false
+    if (expected !== actual) return false
   }
   if (changes.seriesTitle !== undefined && book.seriesTitle.trim() !== changes.seriesTitle.trim()) {
     return false
@@ -327,10 +327,6 @@ async function finalizeMetadataSave(
   fillResult: FillResult,
 ): Promise<KdpMetadataUpdateResult> {
   const pageErrors = await filterActionablePageErrors(page, await collectPageErrors(page))
-  const stillOnDetails = page.url().includes('/details')
-  const leftDetails =
-    !stillOnDetails && page.url().includes(`/title-setup/${format}/`)
-  const onPageDescLen = await readOnPageDescriptionLength(page, format)
   const parsePage = await page.context().newPage()
   let refreshed: KdpBookMetadata | null = null
   try {
@@ -339,28 +335,8 @@ async function finalizeMetadataSave(
     await parsePage.close().catch(() => {})
   }
 
-  const descriptionOk =
-    changes.descriptionHtml === undefined ||
-    (refreshed && changesApplied(refreshed, changes)) ||
-    onPageDescLen > 50 ||
-    (leftDetails && onPageDescLen > 0)
-
   if (refreshed && changesApplied(refreshed, changes)) {
     await patchBookInCache(refreshed)
-    return {
-      titleId,
-      format,
-      dryRun: false,
-      filled: fillResult.filled,
-      skipped: fillResult.skipped,
-      saved: true,
-      errors: [],
-      book: refreshed,
-    }
-  }
-
-  if ((leftDetails || stillOnDetails) && descriptionOk && pageErrors.length === 0) {
-    if (refreshed) await patchBookInCache(refreshed)
     return {
       titleId,
       format,
@@ -533,7 +509,6 @@ export async function updateBookMetadata(
     if (changes.language) {
       await ensureLanguageSelected(page, format, changes.language)
     }
-    await setReleaseNow(page)
 
     const fillResult = await fillDetailsPage(page, format, changes)
 
@@ -559,7 +534,6 @@ export async function updateBookMetadata(
     if (changes.language) {
       await ensureLanguageSelected(page, format, changes.language)
     }
-    await setReleaseNow(page)
 
     await clickSaveOnDetailsPage(page)
 
@@ -661,7 +635,6 @@ export async function updateBookMetadataOnPage(
   if (changes.language) {
     await ensureLanguageSelected(page, format, changes.language)
   }
-  await setReleaseNow(page)
 
   await clickSaveOnDetailsPage(page)
 

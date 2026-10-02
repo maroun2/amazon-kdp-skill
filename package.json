@@ -33,7 +33,9 @@
     "test:all": "node scripts/test-all.mjs",
     "test:throttle": "tsx scripts/test-throttle.mjs",
     "content:status": "tsx scripts/read-book-content.ts",
-    "test:print-content": "tsx --test scripts/test-print-content.ts"
+    "test:print-content": "tsx --test scripts/test-print-content.ts",
+    "upload:print-content": "tsx scripts/upload-print-content.ts",
+    "test:print-upload": "tsx --test scripts/test-print-upload.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
