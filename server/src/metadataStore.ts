@@ -44,6 +44,9 @@ export type KdpBookMetadata = {
   pageCount: string
   manuscriptStatus: string
   coverStatus: string
+  bleed: boolean | null
+  processingErrors: string[]
+  printPreviewerStatus: string
   asin: string
   listPriceUsd: string
   prices: Record<string, string>
@@ -77,7 +80,7 @@ export type KdpMetadataCache = {
   stats?: KdpMetadataSyncStats
 }
 
-export const METADATA_CACHE_VERSION = 2
+export const METADATA_CACHE_VERSION = 3
 
 const METADATA_FILE = path.join(SESSION_DIR, 'book-metadata.json')
 
@@ -120,6 +123,10 @@ export function normalizeBookMetadata(
     pageCount: raw.pageCount ?? '',
     manuscriptStatus: raw.manuscriptStatus ?? '',
     coverStatus: raw.coverStatus ?? '',
+    bleed: typeof raw.bleed === 'boolean' ? raw.bleed : null,
+    processingErrors: Array.isArray(raw.processingErrors)
+      ? raw.processingErrors.filter((v) => typeof v === 'string') : [],
+    printPreviewerStatus: raw.printPreviewerStatus ?? '',
     asin: raw.asin ?? '',
     listPriceUsd: raw.listPriceUsd ?? '',
     prices: raw.prices && typeof raw.prices === 'object' ? raw.prices : {},

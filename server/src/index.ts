@@ -55,7 +55,7 @@ app.use(cors({ origin: true, credentials: true }))
 app.use(express.json())
 
 app.get('/api/kdp/health', (_req, res) => {
-  res.json({ ok: true })
+  res.json({ ok: true, metadataCacheVersion: METADATA_CACHE_VERSION })
 })
 
 app.get('/api/kdp/recovery/learnings', async (_req, res) => {

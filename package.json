@@ -31,7 +31,9 @@
     "title:unpublish": "node scripts/kdp-cli.mjs title-unpublish",
     "discover:apis": "tsx scripts/discover-kdp-apis.mjs",
     "test:all": "node scripts/test-all.mjs",
-    "test:throttle": "tsx scripts/test-throttle.mjs"
+    "test:throttle": "tsx scripts/test-throttle.mjs",
+    "content:status": "tsx scripts/read-book-content.ts",
+    "test:print-content": "tsx --test scripts/test-print-content.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

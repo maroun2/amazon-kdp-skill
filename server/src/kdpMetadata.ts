@@ -8,6 +8,7 @@ import { fetchAndParseKdpHtml, kdpFetchHtml, parseKdpHtml } from './kdpHtmlParse
 import { kdpGoto } from './kdpHttp.js'
 import { fetchAccountCatalogSize, fetchReportsBooksMetadata } from './kdpReportsApi.js'
 import { kdpThrottle } from './kdpRateLimit.js'
+import { fetchPrintSetupContent, type ParsedPrintContent } from './kdpPrintContent.js'
 import {
   type KdpBookFormat,
   type KdpBookMetadata,
@@ -65,17 +66,7 @@ type ParsedDetails = {
   contributors: Array<{ role: string; firstName: string; lastName: string }>
 }
 
-type ParsedContent = {
-  isbn: string
-  imprint: string
-  trimSize: string
-  inkAndPaper: string
-  interiorFileName: string
-  coverFileName: string
-  pageCount: string
-  manuscriptStatus: string
-  coverStatus: string
-}
+type ParsedContent = ParsedPrintContent
 
 type ParsedPricing = {
   asin: string
@@ -398,15 +389,22 @@ export async function fetchBookMetadata(
     pageCount: '',
     manuscriptStatus: '',
     coverStatus: '',
+    bleed: null,
+    processingErrors: [],
+    printPreviewerStatus: '',
   }
-  const parsedContent = await fetchAndParseKdpHtml<ParsedContent>(
-    requestPage,
-    parsePage,
-    setupPageUrl(ref.format, ref.titleId, 'content'),
-    PARSE_CONTENT_FN,
-  )
+  const parsedContent = await fetchPrintSetupContent(requestPage, ref.titleId, ref.format)
+    ?? await fetchAndParseKdpHtml<ParsedContent>(
+      requestPage,
+      parsePage,
+      setupPageUrl(ref.format, ref.titleId, 'content'),
+      PARSE_CONTENT_FN,
+    )
   if (parsedContent) {
-    content = parsedContent
+    content = { ...content, ...parsedContent }
+  }
+  if (ref.format !== 'kindle' && !content.trimSize && !content.interiorFileName && !content.isbn) {
+    throw new KdpClientError('Could not read KDP print content; refusing to cache an empty page shell.')
   }
 
   let pricing: ParsedPricing = {
@@ -462,6 +460,9 @@ export async function fetchBookMetadata(
     pageCount: content.pageCount,
     manuscriptStatus: content.manuscriptStatus,
     coverStatus: content.coverStatus,
+    bleed: content.bleed,
+    processingErrors: content.processingErrors,
+    printPreviewerStatus: content.printPreviewerStatus,
     asin: pricing.asin,
     listPriceUsd: pricing.listPriceUsd,
     prices: pricing.prices,

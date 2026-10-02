@@ -31,6 +31,10 @@
     COLOR_WHITE: 'Premium color interior, white paper',
     COLOR_COLOR: 'Premium color interior, color paper',
   }
+  const bleedEl = document.querySelector(
+    'input[name="data[print_book][interior_has_bleed]"]:checked',
+  )
+  const bleedValue = bleedEl?.value || readHidden('', ['data[print_book][interior_has_bleed]'])
 
   return {
     isbn:
@@ -65,5 +69,8 @@
       'data[print_book][publisher_cover][status]',
       'data[hardcover_book][publisher_cover][status]',
     ]),
+    bleed: bleedValue === 'true' ? true : bleedValue === 'false' ? false : null,
+    processingErrors: [],
+    printPreviewerStatus: '',
   }
 }
