@@ -1,3 +1,4 @@
+import { KdpAuthError, KdpChallengeError, KdpClientError } from './kdpClient.js'
 import type { APIResponse, Page } from 'playwright'
 import { kdpThrottle } from './kdpRateLimit.js'
 
@@ -10,7 +11,10 @@ export async function kdpGoto(
   options?: GotoOptions,
 ) {
   await kdpThrottle()
-  return page.goto(url, options)
+  const response = await page.goto(url, options)
+  if (/captcha|robotcheck/i.test(page.url()) || await page.locator('#captchacharacters').count()) throw new KdpChallengeError()
+  if (/\/ap\/signin|\/signin/i.test(page.url())) throw new KdpAuthError()
+  return response
 }
 
 /** Rate-limited Playwright API request (e.g. report download URLs). */
@@ -30,7 +34,9 @@ export async function kdpFetchJson<T>(
 ): Promise<T | null> {
   await kdpThrottle()
   const res = await page.request.get(url)
-  if (!res.ok()) return null
+  if (/captcha|robotcheck/i.test(res.url())) throw new KdpChallengeError()
+  if (/\/ap\/signin|\/signin/i.test(res.url()) || res.status() === 401) throw new KdpAuthError()
+  if (!res.ok()) throw new KdpClientError(`KDP request failed (${res.status()}); session expiry not established.`)
   try {
     return (await res.json()) as T
   } catch {

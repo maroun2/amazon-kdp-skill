@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { launchKdpBrowser } from '../server/src/browserLaunch.js'
 import { checkSession } from '../server/src/kdpClient.js'
 import { getLoginState, startInteractiveLogin } from '../server/src/login.js'
 
@@ -20,7 +21,10 @@ async function worker(): Promise<void> {
   if (!result.connected) throw new Error('Amazon login ended without a valid KDP session.')
 }
 
-function launcher(): void {
+async function launcher(): Promise<void> {
+  // Fail before creating desktop or asking user to authenticate on broken route.
+  const probe = await launchKdpBrowser({ headless: true })
+  await probe.close()
   const tsx = path.join(root, 'node_modules/.bin/tsx')
   const run = spawnSync('python3', [controller, 'start', '--json', '--', tsx,
     path.join(here, 'remote-login.ts'), 'worker'], { cwd: root, encoding: 'utf8' })
@@ -41,5 +45,5 @@ if (process.argv[2] === 'worker') {
     process.exitCode = 1
   })
 } else {
-  launcher()
+  launcher().catch(error => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1 })
 }

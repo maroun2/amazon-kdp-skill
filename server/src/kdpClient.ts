@@ -1,15 +1,21 @@
+import { withSavedBrowser } from './savedBrowser.js'
 import type { Page } from 'playwright'
-import { launchKdpBrowser } from './browserLaunch.js'
 import { KDP_API, KDP_PMR_PAGE, KDP_ROYALTIES_PAGE } from './config.js'
 import { kdpFetchJson, kdpFetchText, kdpGoto, kdpRequestGet } from './kdpHttp.js'
 import { mergeWorkbookBuffers } from './mergeWorkbooks.js'
-import { sessionExists, sessionFilePath } from './session.js'
+import { sessionExists } from './session.js'
 
 export class KdpAuthError extends Error {
+  readonly code = 'auth_required'
   constructor(message = 'Amazon KDP session expired or not connected.') {
     super(message)
     this.name = 'KdpAuthError'
   }
+}
+
+export class KdpChallengeError extends Error {
+  readonly code = 'challenge_required'
+  constructor() { super('Amazon CAPTCHA or security challenge requires user handoff. Stop automation; no bypass.'); this.name = 'KdpChallengeError' }
 }
 
 export class KdpClientError extends Error {
@@ -63,28 +69,13 @@ function filterMonthsInRange(
 }
 
 async function withKdpPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
-  if (!(await sessionExists())) {
-    throw new KdpAuthError()
-  }
-
-  const browser = await launchKdpBrowser({ headless: true })
-
-  try {
-    const context = await browser.newContext({ storageState: sessionFilePath() })
+  return withSavedBrowser(async context => {
     const page = await context.newPage()
-    await kdpGoto(page, KDP_ROYALTIES_PAGE, {
-      waitUntil: 'networkidle',
-      timeout: 120_000,
-    })
-
-    if (page.url().toLowerCase().includes('signin')) {
-      throw new KdpAuthError()
-    }
-
+    await kdpGoto(page, KDP_ROYALTIES_PAGE, { waitUntil: 'networkidle', timeout: 120_000 })
+    if (/captcha|robotcheck/i.test(page.url())) throw new KdpChallengeError()
+    if (/signin/i.test(page.url())) throw new KdpAuthError()
     return await fn(page)
-  } finally {
-    await browser.close()
-  }
+  }, { headless: true })
 }
 
 async function getAccountCreationDate(page: Page): Promise<string> {
@@ -133,9 +124,10 @@ async function requestPmrReportUrl(
 export async function checkSession(): Promise<{
   connected: boolean
   accountCreationDate?: string
+  code?: 'auth_required'
 }> {
   if (!(await sessionExists())) {
-    return { connected: false }
+    return { connected: false, code: 'auth_required' }
   }
 
   try {
@@ -144,8 +136,8 @@ export async function checkSession(): Promise<{
       return { connected: true, accountCreationDate }
     })
   } catch (e) {
-    if (e instanceof KdpAuthError || e instanceof KdpClientError) {
-      return { connected: false }
+    if (e instanceof KdpAuthError) {
+      return { connected: false, code: 'auth_required' }
     }
     throw e
   }

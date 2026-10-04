@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { ensureEgress, EgressError, verifyEgressIp } from './egress.js'
 import { chromium, type Browser } from 'playwright'
 
 /**
@@ -199,15 +200,40 @@ export async function launchKdpBrowser(
   const executablePath = resolveChromiumExecutablePath(!headless)
   if (!executablePath) throw new ChromiumNotFoundError()
 
-  return chromium.launch({
+  const route = await ensureEgress()
+  const browser = await chromium.launch({
+    proxy: { server: route.server },
     headless,
     executablePath,
     args: [
       ...BASE_ARGS,
+      '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1',
+      '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
+      '--disable-quic',
       ...(process.platform === 'linux'
         ? ['--no-sandbox', '--disable-dev-shm-usage']
         : []),
       ...(options.args ?? []),
     ],
   })
+  try {
+    // Context-level proxy also covers page.request, including signed asset PUTs.
+    const originalNewContext = browser.newContext.bind(browser)
+    browser.newContext = options => originalNewContext({ ...options, proxy: { server: route.server } })
+    const probe = await browser.newContext()
+    try {
+      const response = await probe.request.get('https://api.ipify.org', { timeout: 15000 })
+      if (!response.ok()) throw new EgressError('Egress IP probe failed; no Amazon request sent.')
+      const requestIp = (await response.text()).trim()
+      const page = await probe.newPage()
+      await page.goto('https://api.ipify.org', { timeout: 15000, waitUntil: 'domcontentloaded' })
+      const browserIp = (await page.locator('body').innerText()).trim()
+      await verifyEgressIp(route.config, browserIp, requestIp)
+    } finally { await probe.close() }
+    return browser
+  } catch (e) {
+    await browser.close()
+    if (e instanceof EgressError) throw e
+    throw new EgressError(`Proxy route verification failed: ${e instanceof Error ? e.message.slice(0, 600) : 'unknown error'}. No Amazon request sent.`)
+  }
 }

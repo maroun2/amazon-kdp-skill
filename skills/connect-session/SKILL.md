@@ -20,7 +20,7 @@ npm run server:start   # background if not already listening on :3001
 npm run status
 ```
 
-`connected: true` → ready. `connected: false` → start login flow below.
+`connected: true` means ready. `connected: false` with `code: auth_required` means normal Amazon login is required. `egress_down`, `operation_busy`, `challenge_required` and `kdp` errors do not establish expiry. Fix reported cause; preserve saved session. Before allocating desktop, run `npm run egress:verify`. Read [SSH egress](../../docs/SSH-EGRESS.md) for route setup and IP pin. No direct fallback.
 
 ## Sign in (agent-driven, machine with a display)
 
@@ -68,7 +68,11 @@ Clears session cookies and local metadata cache.
 
 ## Errors
 
-- **401 on any endpoint** → session expired; re-run login (or re-import on a headless machine)
+- **`auth_required`** → Amazon requires sign-in; use remote login and normal MFA after healthy route check.
+- **`egress_down`** → fix SSH/config/IP before login; never fall back to direct.
+- **`operation_busy`** → wait for current operation.
+- **`challenge_required`** → stop and hand off to user; no automated bypass.
+- **`kdp`** → response/schema/service error; session expiry not established.
 - **`code: no_display` from login** → headless host; use the import path above, do not retry
 - **Login already in progress** → wait for browser window to finish
 

@@ -1,3 +1,4 @@
+import { uploadFile } from '../server/src/uploadQuota.js'
 /** One modern print upload. No processing retries, preview approval, or publication. */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -82,7 +83,7 @@ async function main() {
     await kdpThrottle()
     const assetType = fileType === 'interior' ? 'KDP_PRINT_BOOK_PUBLISHER_INTERIOR' : 'KDP_PRINT_BOOK_PUBLISHER_COVER'
     const transferred = page.waitForResponse(r => r.request().method() === 'PUT' && new URL(r.url()).pathname.endsWith(`/${assetType}`),{timeout:60000})
-    await fileInput.setInputFiles(filePath)
+    await uploadFile(fileInput, filePath)
     const transferResponse = await transferred
     if (!transferResponse.ok()) throw Error(`KDP file transfer failed (${transferResponse.status()}). No retry performed.`)
     // Upload completion is distinct from background PDF processing. Let KDP finish

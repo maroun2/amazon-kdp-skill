@@ -9,7 +9,8 @@
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { sessionDir, sessionFilePath } from './lib/sessionPaths.mjs'
+import { sessionFilePath, withSessionOperation } from '../server/src/session.js'
+import { atomicPrivateJson } from '../server/src/privateState.js'
 
 const REQUIRED_DOMAINS = ['amazon.com']
 
@@ -76,8 +77,7 @@ const dest = sessionFilePath()
 const dir = path.dirname(dest)
 await fs.mkdir(dir, { recursive: true, mode: 0o700 })
 await fs.chmod(dir, 0o700).catch(() => {})
-await fs.writeFile(dest, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
-await fs.chmod(dest, 0o600)
+await withSessionOperation(() => atomicPrivateJson(dest, state))
 
 // Cookie expiries tell the operator how long this will last. Values are never printed.
 const expiries = state.cookies

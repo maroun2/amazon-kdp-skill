@@ -1,5 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import type { BrowserContext } from 'playwright'
+import { atomicPrivateJson, withPrivateLock } from './privateState.js'
 import { SESSION_DIR, SESSION_FILE } from './config.js'
 
 export async function sessionExists(): Promise<boolean> {
@@ -61,11 +63,18 @@ export function sessionFilePath(): string {
   return SESSION_FILE
 }
 
-/** Best-effort wipe of session dir contents except keeping the folder. */
+/** Clear authentication without deleting tunnel configuration, locks or upload ledger. */
 export async function clearSessionDir(): Promise<void> {
+  await withSessionOperation(removeSession)
+}
+
+/** Serialize login and all saved-session users across server and CLI processes. */
+export async function withSessionOperation<T>(fn: () => Promise<T>): Promise<T> {
   await ensureSessionDir()
-  const entries = await fs.readdir(SESSION_DIR)
-  await Promise.all(
-    entries.map((name) => fs.unlink(path.join(SESSION_DIR, name)).catch(() => {})),
-  )
+  return withPrivateLock(path.join(SESSION_DIR, 'session.lock'), fn)
+}
+
+/** Called only after successful authenticated operations; failures keep prior state. */
+export async function saveSession(context: BrowserContext): Promise<void> {
+  await atomicPrivateJson(SESSION_FILE, await context.storageState({ indexedDB: true }))
 }

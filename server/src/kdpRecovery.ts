@@ -290,6 +290,8 @@ export async function runWithRecovery<T>(
     try {
       lastResult = await fn()
     } catch (e) {
+      if (e instanceof Error && ['KdpAuthError', 'KdpChallengeError'].includes(e.name)) throw e
+      if (e && typeof e === 'object' && 'code' in e && ['egress_down', 'upload_limit', 'operation_busy'].includes(String(e.code))) throw e
       threw = e
       lastResult = undefined
     }

@@ -9,7 +9,7 @@
     "server:start": "tsx server/src/index.ts",
     "login": "node scripts/kdp-cli.mjs login",
     "login:remote": "tsx scripts/remote-login.ts",
-    "session:import": "node scripts/session-import.mjs",
+    "session:import": "tsx scripts/session-import.mjs",
     "session:verify": "tsx scripts/session-verify.ts",
     "browser:check": "tsx scripts/browser-check.ts",
     "status": "node scripts/kdp-cli.mjs status",
@@ -35,7 +35,9 @@
     "content:status": "tsx scripts/read-book-content.ts",
     "test:print-content": "tsx --test scripts/test-print-content.ts",
     "upload:print-content": "tsx scripts/upload-print-content.ts",
-    "test:print-upload": "tsx --test scripts/test-print-upload.ts"
+    "test:print-upload": "tsx --test scripts/test-print-upload.ts",
+    "egress:verify": "tsx scripts/egress-verify.ts",
+    "test:session-safety": "tsx --test scripts/test-session-safety.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -18,7 +18,9 @@ Self-contained skill repo with a local Express + Playwright server. Amazon has *
 4. **Run all KDP tasks yourself** via npm scripts or the local REST API.
 5. **Only pause for the user** during Amazon login — they must complete sign-in (incl. MFA) in visible Chromium. On this headless VPS run `npm run login:remote`, send returned noVNC URL/password, then poll session verification. Use `docs/HEADLESS-LOGIN.md` import only as fallback.
 
-Session persists in `.kdp-session/` (gitignored).
+Session persists outside repo in `~/.config/amazon-kdp-skill/` with mode 0600.
+
+Before login or Amazon access, run `npm run egress:verify`. Configure owned SSH route per [docs/SSH-EGRESS.md](docs/SSH-EGRESS.md). No direct fallback. `egress_down`, `operation_busy`, `challenge_required` and `kdp` errors require their own fixes; request login only for `auth_required`. Every command for same account must share session directory. Successful operations refresh saved state; failed authentication or parsing preserves it. File uploads share 20-attempt rolling-hour cap, including uncertain transfers. Never promise permanent login or zero ban risk.
 
 ## Sequential operations (required)
 
@@ -136,7 +138,7 @@ If recovery exhausts retries, read `errors` and `recoveryLog`, then fix the unde
 
 ## Rules for agents
 
-1. **Always check session** (`npm run status`) before sync/update. If `connected: false`, run login sub-skill first.
+1. **Always check session** (`npm run status`) before sync/update. If `connected: false` with `code: auth_required`, run login sub-skill. Inspect other error codes before requesting login.
 2. **One operation at a time** for writes — see [Sequential operations](#sequential-operations-required). No batch scripts, no parallel publishes, no `/batch` API for multiple titles.
 3. **Never commit** `.kdp-session/` or downloaded `.xlsx` files.
 4. **Rate limiting**: the server waits a random 4-10s before every KDP page load and API call (`KDP_REQUEST_DELAY_MIN_MS` / `KDP_REQUEST_DELAY_MAX_MS`). Do not bypass this.

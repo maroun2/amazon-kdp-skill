@@ -79,3 +79,5 @@ Optional `aiImages` is exact visible disclosure option; change it only from veri
 Upload/save HTTP 200 and persisted filename prove file transfer, not PDF acceptance. Run `npm run content:status -- TITLE_ID paperback --json` afterward. `NOT_READY` / `*_PROCESSING_NOT_COMPLETED` is pending; `FAILED` is failure. No blind retry loops. Unknown forms, CAPTCHA, settings mismatch or auth prompts stop without writing. Legacy REST endpoint still targets legacy forms.
 
 Verified on 2026-10-02: one 90-page English interior and one matching cover transferred with HTTP 200, draft saves returned HTTP 200, and both filenames persisted. KDP processing remained pending; acceptance was not claimed. Regression tests cover reversed modern file-input order and metadata verification failures.
+
+All upload paths reserve shared slot before transfer. Limit is 20 attempts per rolling hour, including failures and uncertain outcomes. Dry-run consumes no slot. `upload_limit` stops operation; wait until reported slot time. Never clear ledger to retry. All account commands must share session directory.

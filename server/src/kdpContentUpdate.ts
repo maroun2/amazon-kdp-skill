@@ -1,3 +1,4 @@
+import { uploadFile } from './uploadQuota.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -119,7 +120,7 @@ async function clearFailedContentUploads(page: Page): Promise<void> {
 async function uploadInteriorFile(page: Page, filePath: string): Promise<void> {
   await revealContentUpload(page, 'interior')
   const input = page.locator('#data-print-book-publisher-interior-file-upload-AjaxInput')
-  await input.setInputFiles(filePath)
+  await uploadFile(input, filePath)
   await waitForUploadSuccess(page, path.basename(filePath))
   await waitForContentFileStatus(page, 'manuscript', { timeoutMs: 300_000 }).catch(() => {})
 }
@@ -134,7 +135,7 @@ async function uploadCoverFile(page: Page, filePath: string): Promise<void> {
 
   const coverInput = page.locator('#data-print-book-publisher-cover-file-upload-AjaxInput')
   await coverInput.waitFor({ state: 'attached', timeout: 30_000 })
-  await coverInput.setInputFiles(filePath)
+  await uploadFile(coverInput, filePath)
 
   await waitForCoverUploadSuccessElement(page).catch(async () => {
     await waitForUploadSuccess(page, path.basename(filePath))
@@ -445,7 +446,7 @@ export async function uploadBookContentOnPage(
     }
   }
 
-  await input.setInputFiles(filePath)
+  await uploadFile(input, filePath)
   await page.waitForTimeout(3000)
 
   await page

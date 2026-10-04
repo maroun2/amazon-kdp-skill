@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Page } from 'playwright'
-import { defaultHeadless, launchKdpBrowser } from './browserLaunch.js'
+import { defaultHeadless } from './browserLaunch.js'
 import { KdpAuthError, KdpClientError } from './kdpClient.js'
 import { fetchAndParseKdpHtml, kdpFetchHtml, parseKdpHtml } from './kdpHtmlParse.js'
 import { kdpGoto } from './kdpHttp.js'
@@ -17,7 +17,7 @@ import {
   METADATA_CACHE_VERSION,
   writeMetadataCache,
 } from './metadataStore.js'
-import { sessionExists, sessionFilePath } from './session.js'
+import { withSavedBrowser } from './savedBrowser.js'
 
 const BOOKSHELF_URL = 'https://kdp.amazon.com/en_US/bookshelf'
 
@@ -114,29 +114,14 @@ export async function withKdpPages<T>(
   fn: (pages: { action: Page; parse: Page }) => Promise<T>,
   options: KdpBrowserOptions = {},
 ): Promise<T> {
-  if (!(await sessionExists())) {
-    throw new KdpAuthError()
-  }
-
   const headless = options.headless ?? defaultHeadless()
-  const viewport = options.viewport ?? { width: 1920, height: 1080 }
-
-  const browser = await launchKdpBrowser({
-    headless,
-    args: headless ? [] : ['--start-maximized'],
-  })
-
-  try {
-    const context = await browser.newContext({
-      storageState: sessionFilePath(),
-      viewport,
-    })
+  return withSavedBrowser(async context => {
     const action = await context.newPage()
     const parse = await context.newPage()
     return await fn({ action, parse })
-  } finally {
-    await browser.close()
-  }
+  }, { headless, args: headless ? [] : ['--start-maximized'] }, {
+    viewport: options.viewport ?? { width: 1920, height: 1080 },
+  })
 }
 
 async function scanCurrentBookshelfPage(page: Page): Promise<BookshelfPageScan> {

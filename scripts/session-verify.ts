@@ -32,10 +32,14 @@ if (!(await sessionFileIsPrivate())) {
 const { savedAt } = await readSessionMeta()
 console.log(`Saved at: ${savedAt ?? 'unknown'}`)
 
-const result = await checkSession()
+const result = await checkSession().catch(error => {
+  console.error(JSON.stringify({ code: error.code ?? (error.name === 'KdpClientError' ? 'kdp' : 'unknown'), error: error.message }))
+  console.error('Fix reported error before requesting login. Saved session preserved.')
+  process.exit(2)
+})
 if (!result.connected) {
   console.error('\nSession is NOT valid — Amazon redirected to sign-in, or the cookies expired.')
-  console.error('Re-capture on your own machine and re-import: docs/HEADLESS-LOGIN.md')
+  console.error('Route is healthy but Amazon requires authentication. Run npm run login:remote once.')
   process.exit(1)
 }
 

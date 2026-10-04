@@ -1,11 +1,11 @@
+import { withSavedBrowser } from './savedBrowser.js'
 import type { Page } from 'playwright'
 import { KdpAuthError, KdpClientError } from './kdpClient.js'
 import { kdpFetchJson } from './kdpHttp.js'
 import { kdpGoto } from './kdpHttp.js'
 import { fetchReportsMetadata } from './kdpReportsApi.js'
 import { KDP_API, KDP_ROYALTIES_PAGE } from './config.js'
-import { sessionExists, sessionFilePath } from './session.js'
-import { launchKdpBrowser } from './browserLaunch.js'
+import { sessionExists } from './session.js'
 
 export type KdpAccountInfo = {
   accountCreationDate: string
@@ -28,26 +28,12 @@ export type KdpCatalogBook = {
 }
 
 async function withReportsPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
-  if (!(await sessionExists())) {
-    throw new KdpAuthError()
-  }
-
-  const browser = await launchKdpBrowser({ headless: true })
-
-  try {
-    const context = await browser.newContext({ storageState: sessionFilePath() })
+  return withSavedBrowser(async context => {
     const page = await context.newPage()
-    await kdpGoto(page, KDP_ROYALTIES_PAGE, {
-      waitUntil: 'networkidle',
-      timeout: 120_000,
-    })
-    if (page.url().toLowerCase().includes('signin')) {
-      throw new KdpAuthError()
-    }
+    await kdpGoto(page, KDP_ROYALTIES_PAGE, { waitUntil: 'networkidle', timeout: 120_000 })
+    if (/signin|captcha|robotcheck/i.test(page.url())) throw new KdpAuthError()
     return await fn(page)
-  } finally {
-    await browser.close()
-  }
+  }, { headless: true })
 }
 
 export async function fetchAccountInfo(): Promise<KdpAccountInfo> {

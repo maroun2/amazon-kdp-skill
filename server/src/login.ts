@@ -1,78 +1,40 @@
-import { KDP_ROYALTIES_PAGE } from './config.js'
+import { KDP_API, KDP_ROYALTIES_PAGE } from './config.js'
 import { hasDisplay, launchKdpBrowser, NoDisplayError } from './browserLaunch.js'
-import { ensureSessionDir, secureSessionFile, sessionFilePath } from './session.js'
-import { checkSession } from './kdpClient.js'
+import { saveSession, withSessionOperation, sessionExists, sessionFilePath } from './session.js'
+import { KdpClientError } from './kdpClient.js'
+import { kdpFetchJson } from './kdpHttp.js'
 
 let loginInProgress = false
 let loginError: string | null = null
+export function getLoginState() { return { loginInProgress, loginError } }
 
-export function getLoginState(): {
-  loginInProgress: boolean
-  loginError: string | null
-} {
-  return { loginInProgress, loginError }
-}
-
-/**
- * Open a visible browser so the user can sign in to Amazon KDP (incl. MFA).
- *
- * Throws synchronously on a display-less host (VPS, container, CI) instead of
- * spinning for ten minutes against a window that can never appear. The message
- * points at the storage_state import path in docs/HEADLESS-LOGIN.md.
- */
+/** User handles normal Amazon sign-in/MFA. Existing state survives failed login. */
 export async function startInteractiveLogin(): Promise<void> {
-  if (loginInProgress) {
-    throw new Error('Login already in progress.')
-  }
-  if (!hasDisplay()) {
-    // Also record it on the polled state, so a client that only reads
-    // getLoginState() still learns why nothing happened.
-    loginError = new NoDisplayError().message
-    throw new NoDisplayError()
-  }
-
+  if (loginInProgress) throw new Error('Login already in progress.')
+  if (!hasDisplay()) { loginError = new NoDisplayError().message; throw new NoDisplayError() }
   loginInProgress = true
   loginError = null
-
-  void (async () => {
-    let browser: Awaited<ReturnType<typeof launchKdpBrowser>> | null = null
+  void withSessionOperation(async () => {
+    const browser = await launchKdpBrowser({ headless: false })
     try {
-      await ensureSessionDir()
-      browser = await launchKdpBrowser({ headless: false })
-      const context = await browser.newContext()
+      const context = await browser.newContext(await sessionExists() ? { storageState: sessionFilePath() } : {})
       const page = await context.newPage()
       await page.goto(KDP_ROYALTIES_PAGE, { waitUntil: 'domcontentloaded' })
-
       const deadline = Date.now() + 10 * 60 * 1000
       while (Date.now() < deadline) {
-        const url = page.url()
-        if (
-          url.includes('kdpreports.amazon.com') &&
-          url.includes('/reports/') &&
-          !url.toLowerCase().includes('signin')
-        ) {
+        if (new URL(page.url()).hostname === 'kdpreports.amazon.com' && page.url().includes('/reports/')) {
           const html = await page.content()
           if (html.includes('csrftoken":{"token":"')) {
-            await context.storageState({ path: sessionFilePath() })
-            await secureSessionFile()
-            loginError = null
-            break
+            const account = await kdpFetchJson<{ customerAccountInfoModel?: object }>(page, KDP_API.accountInfo)
+            if (!account?.customerAccountInfoModel) throw new KdpClientError('Login dashboard loaded but account response is unreadable. Existing session preserved.')
+            await saveSession(context)
+            return
           }
         }
         await page.waitForTimeout(1500)
       }
-
-      if (!(await checkSession()).connected) {
-        loginError =
-          loginError ??
-          'Sign-in timed out or was not completed. Try again and finish Amazon login in the browser window.'
-      }
-    } catch (e) {
-      loginError =
-        e instanceof Error ? e.message : 'Unexpected error during Amazon login.'
-    } finally {
-      loginInProgress = false
-      await browser?.close().catch(() => {})
-    }
-  })()
+      throw new Error('Sign-in timed out. Existing session preserved. Finish normal Amazon login and MFA before retrying.')
+    } finally { await browser.close() }
+  }).catch(error => { loginError = error instanceof Error ? error.message : 'Unexpected Amazon login error.' })
+    .finally(() => { loginInProgress = false })
 }

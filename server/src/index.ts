@@ -1,3 +1,6 @@
+import { EgressError, readEgressStatus } from './egress.js'
+import { OperationBusyError } from './privateState.js'
+import { UploadLimitError } from './uploadQuota.js'
 import cors from 'cors'
 import express from 'express'
 import { fetchAccountInfo, fetchReportsCatalog } from './kdpAccount.js'
@@ -20,6 +23,7 @@ import {
   downloadLifetimeRoyaltiesReport,
   downloadRoyaltiesReport,
   KdpAuthError,
+  KdpChallengeError,
   KdpClientError,
 } from './kdpClient.js'
 import {
@@ -45,7 +49,7 @@ import {
   removeMetadataCache,
   type KdpBookFormat,
 } from './metadataStore.js'
-import { readSessionMeta, removeSession } from './session.js'
+import { readSessionMeta, removeSession, withSessionOperation } from './session.js'
 import { PORT } from './config.js'
 import { readRecoveryLearnings } from './kdpRecoveryStore.js'
 
@@ -54,8 +58,8 @@ const app = express()
 app.use(cors({ origin: true, credentials: true }))
 app.use(express.json())
 
-app.get('/api/kdp/health', (_req, res) => {
-  res.json({ ok: true, metadataCacheVersion: METADATA_CACHE_VERSION })
+app.get('/api/kdp/health', async (_req, res) => {
+  res.json({ ok: true, metadataCacheVersion: METADATA_CACHE_VERSION, egress: await readEgressStatus(), uploadLimitPerHour: 20 })
 })
 
 app.get('/api/kdp/recovery/learnings', async (_req, res) => {
@@ -71,22 +75,21 @@ app.get('/api/kdp/recovery/learnings', async (_req, res) => {
 
 app.get('/api/kdp/status', async (_req, res) => {
   try {
-    const [{ connected, accountCreationDate }, meta, login] = await Promise.all([
+    const [{ connected, accountCreationDate, code }, meta, login] = await Promise.all([
       checkSession(),
       readSessionMeta(),
       Promise.resolve(getLoginState()),
     ])
     res.json({
       connected,
+      code: code ?? null,
       accountCreationDate: accountCreationDate ?? null,
       sessionSavedAt: meta.savedAt,
       loginInProgress: login.loginInProgress,
       loginError: login.loginError,
     })
   } catch (e) {
-    res.status(500).json({
-      error: e instanceof Error ? e.message : 'Failed to read KDP status.',
-    })
+    handleKdpError(res, e, 'Failed to read KDP status.')
   }
 })
 
@@ -118,7 +121,7 @@ app.post('/api/kdp/login/start', async (_req, res) => {
 })
 
 app.delete('/api/kdp/session', async (_req, res) => {
-  await removeSession()
+  await withSessionOperation(removeSession)
   await removeMetadataCache()
   res.json({ disconnected: true })
 })
@@ -689,8 +692,12 @@ function parsePublishBody(body: unknown): PublishBookRequest | { error: string }
 }
 
 function handleKdpError(res: express.Response, e: unknown, fallback: string): void {
+  if (e instanceof EgressError || e instanceof OperationBusyError || e instanceof UploadLimitError || e instanceof KdpChallengeError) {
+    res.status(e instanceof UploadLimitError ? 429 : e instanceof OperationBusyError ? 409 : e instanceof KdpChallengeError ? 403 : 503).json({ error: e.message, code: e.code })
+    return
+  }
   if (e instanceof KdpAuthError) {
-    res.status(401).json({ error: e.message, code: 'auth' })
+    res.status(401).json({ error: e.message, code: e.code })
     return
   }
   if (e instanceof KdpClientError) {

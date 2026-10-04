@@ -3,7 +3,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { launchKdpBrowser } from '../server/src/browserLaunch.js'
+import { withSavedBrowser } from '../server/src/savedBrowser.js'
 import { sessionFilePath } from './lib/sessionPaths.mjs'
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
@@ -38,30 +38,29 @@ async function probe(page, url, init = {}) {
 }
 
 async function main() {
-  const browser = await launchKdpBrowser({ headless: true })
-  const context = await browser.newContext({ storageState: sessionFile })
-  const page = await context.newPage()
-  await page.goto('https://kdpreports.amazon.com/reports/royalties', {
-    waitUntil: 'networkidle',
-    timeout: 120_000,
-  })
+  return withSavedBrowser(async context => {
+    const page = await context.newPage()
+    await page.goto('https://kdpreports.amazon.com/reports/royalties', {
+      waitUntil: 'networkidle',
+      timeout: 120_000,
+    })
 
-  const out = {}
-  for (const url of ENDPOINTS) {
-    out[url] = await probe(page, url)
-    await new Promise((r) => setTimeout(r, 4000))
-    // POST variant for table/titles
-    if (url.includes('table/titles')) {
-      out[`POST ${url}`] = await probe(page, url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        data: '{}',
-      })
+    const out = {}
+    for (const url of ENDPOINTS) {
+      out[url] = await probe(page, url)
+      await new Promise((r) => setTimeout(r, 4000))
+      // POST variant for table/titles
+      if (url.includes('table/titles')) {
+        out[`POST ${url}`] = await probe(page, url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          data: '{}',
+        })
+      }
     }
-  }
 
-  await browser.close()
-  console.log(JSON.stringify(out, null, 2))
+    console.log(JSON.stringify(out, null, 2))
+  }, { headless: true })
 }
 
 main().catch(console.error)

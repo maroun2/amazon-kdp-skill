@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { launchKdpBrowser } from '../server/src/browserLaunch.js'
+import { withSavedBrowser } from '../server/src/savedBrowser.js'
 import { sessionFilePath } from './lib/sessionPaths.mjs'
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
@@ -94,102 +94,101 @@ async function main() {
     process.exit(1)
   }
 
-  const browser = await launchKdpBrowser({ headless: true })
-  const context = await browser.newContext({ storageState: sessionFile })
-  const page = await context.newPage()
+  return withSavedBrowser(async context => {
+    const page = await context.newPage()
 
-  const result = {
-    discoveredAt: new Date().toISOString(),
-    reportsEndpoints: {},
-    kdpEndpointGuesses: {},
-    networkCapture: {},
-  }
-
-  await page.goto(`${REPORTS_ORIGIN}/reports/royalties`, {
-    waitUntil: 'networkidle',
-    timeout: 120_000,
-  })
-
-  for (const ep of REPORTS_ENDPOINTS) {
-    const url = `${REPORTS_ORIGIN}${ep}`
-    result.reportsEndpoints[ep] = await fetchProbe(page, url)
-    await new Promise((r) => setTimeout(r, 4000))
-  }
-
-  // booksMetadata often requires POST from the reports dashboard context
-  result.reportsEndpointsPost = {}
-  for (const ep of ['/api/v2/reports/booksMetadata', '/api/v2/reports/customerMetadata']) {
-    const url = `${REPORTS_ORIGIN}${ep}`
-    result.reportsEndpointsPost[ep] = await page.evaluate(async (fetchUrl) => {
-      try {
-        const res = await fetch(fetchUrl, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
-        })
-        const text = await res.text()
-        return { ok: res.ok, status: res.status, preview: text.slice(0, 2000) }
-      } catch (e) {
-        return { ok: false, error: e instanceof Error ? e.message : String(e) }
-      }
-    }, url)
-    await new Promise((r) => setTimeout(r, 4000))
-  }
-
-  await page.goto(`${KDP_ORIGIN}/en_US/bookshelf`, {
-    waitUntil: 'networkidle',
-    timeout: 120_000,
-  })
-
-  for (const ep of KDP_ENDPOINT_GUESSES) {
-    const url = `${KDP_ORIGIN}${ep}`
-    result.kdpEndpointGuesses[ep] = await fetchProbe(page, url)
-    await new Promise((r) => setTimeout(r, 4000))
-  }
-
-  result.networkCapture.bookshelf = await captureNetworkOnPageLoad(
-    page,
-    `${KDP_ORIGIN}/en_US/bookshelf`,
-  )
-
-  result.networkCapture.reportsRoyalties = await captureNetworkOnPageLoad(
-    page,
-    `${REPORTS_ORIGIN}/reports/royalties`,
-  )
-
-  // Try to find a title-setup link and capture its XHR traffic
-  const setupLink = await page.evaluate(() => {
-    for (const a of document.querySelectorAll('a[href*="title-setup"]')) {
-      const href = a.getAttribute('href')
-      if (href?.includes('/details')) return href.startsWith('http') ? href : `https://kdp.amazon.com${href}`
+    const result = {
+      discoveredAt: new Date().toISOString(),
+      reportsEndpoints: {},
+      kdpEndpointGuesses: {},
+      networkCapture: {},
     }
-    return null
-  })
 
-  if (setupLink) {
-    result.networkCapture.titleSetupDetails = await captureNetworkOnPageLoad(page, setupLink)
-    result.sampleSetupUrl = setupLink
+    await page.goto(`${REPORTS_ORIGIN}/reports/royalties`, {
+      waitUntil: 'networkidle',
+      timeout: 120_000,
+    })
 
-    // Probe JSON embedded in page
-    result.embeddedState = await page.evaluate(() => {
-      const scripts = [...document.querySelectorAll('script')]
-      for (const s of scripts) {
-        const t = s.textContent ?? ''
-        if (t.includes('keywords') && (t.includes('titleId') || t.includes('print_book'))) {
-          return t.slice(0, 3000)
+    for (const ep of REPORTS_ENDPOINTS) {
+      const url = `${REPORTS_ORIGIN}${ep}`
+      result.reportsEndpoints[ep] = await fetchProbe(page, url)
+      await new Promise((r) => setTimeout(r, 4000))
+    }
+
+    // booksMetadata often requires POST from the reports dashboard context
+    result.reportsEndpointsPost = {}
+    for (const ep of ['/api/v2/reports/booksMetadata', '/api/v2/reports/customerMetadata']) {
+      const url = `${REPORTS_ORIGIN}${ep}`
+      result.reportsEndpointsPost[ep] = await page.evaluate(async (fetchUrl) => {
+        try {
+          const res = await fetch(fetchUrl, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+          })
+          const text = await res.text()
+          return { ok: res.ok, status: res.status, preview: text.slice(0, 2000) }
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : String(e) }
         }
+      }, url)
+      await new Promise((r) => setTimeout(r, 4000))
+    }
+
+    await page.goto(`${KDP_ORIGIN}/en_US/bookshelf`, {
+      waitUntil: 'networkidle',
+      timeout: 120_000,
+    })
+
+    for (const ep of KDP_ENDPOINT_GUESSES) {
+      const url = `${KDP_ORIGIN}${ep}`
+      result.kdpEndpointGuesses[ep] = await fetchProbe(page, url)
+      await new Promise((r) => setTimeout(r, 4000))
+    }
+
+    result.networkCapture.bookshelf = await captureNetworkOnPageLoad(
+      page,
+      `${KDP_ORIGIN}/en_US/bookshelf`,
+    )
+
+    result.networkCapture.reportsRoyalties = await captureNetworkOnPageLoad(
+      page,
+      `${REPORTS_ORIGIN}/reports/royalties`,
+    )
+
+    // Try to find a title-setup link and capture its XHR traffic
+    const setupLink = await page.evaluate(() => {
+      for (const a of document.querySelectorAll('a[href*="title-setup"]')) {
+        const href = a.getAttribute('href')
+        if (href?.includes('/details')) return href.startsWith('http') ? href : `https://kdp.amazon.com${href}`
       }
       return null
     })
-  }
 
-  await browser.close()
+    if (setupLink) {
+      result.networkCapture.titleSetupDetails = await captureNetworkOnPageLoad(page, setupLink)
+      result.sampleSetupUrl = setupLink
 
-  await fs.mkdir(path.dirname(outFile), { recursive: true })
-  await fs.writeFile(outFile, JSON.stringify(result, null, 2))
-  console.log(`Wrote ${outFile}`)
-  console.log(JSON.stringify(result, null, 2))
+      // Probe JSON embedded in page
+      result.embeddedState = await page.evaluate(() => {
+        const scripts = [...document.querySelectorAll('script')]
+        for (const s of scripts) {
+          const t = s.textContent ?? ''
+          if (t.includes('keywords') && (t.includes('titleId') || t.includes('print_book'))) {
+            return t.slice(0, 3000)
+          }
+        }
+        return null
+      })
+    }
+
+
+    await fs.mkdir(path.dirname(outFile), { recursive: true })
+    await fs.writeFile(outFile, JSON.stringify(result, null, 2))
+    console.log(`Wrote ${outFile}`)
+    console.log(JSON.stringify(result, null, 2))
+  }, { headless: true })
 }
 
 main().catch((e) => {
