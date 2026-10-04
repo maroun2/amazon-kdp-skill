@@ -31,11 +31,13 @@ export async function kdpRequestGet(
 export async function kdpFetchJson<T>(
   page: Page,
   url: string,
+  unavailableStatuses: readonly (400 | 404 | 405)[] = [],
 ): Promise<T | null> {
   await kdpThrottle()
   const res = await page.request.get(url)
   if (/captcha|robotcheck/i.test(res.url())) throw new KdpChallengeError()
   if (/\/ap\/signin|\/signin/i.test(res.url()) || res.status() === 401) throw new KdpAuthError()
+  if (!res.ok() && unavailableStatuses.some(status => status === res.status())) return null
   if (!res.ok()) throw new KdpClientError(`KDP request failed (${res.status()}); session expiry not established.`)
   try {
     return (await res.json()) as T

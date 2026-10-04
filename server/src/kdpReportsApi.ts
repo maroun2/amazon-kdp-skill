@@ -94,7 +94,7 @@ export function parseBooksMetadataRefs(data: unknown): ReportsBookRef[] {
 }
 
 export async function fetchReportsBooksMetadata(page: Page): Promise<ReportsBookRef[]> {
-  const data = await kdpFetchJson<unknown>(page, KDP_API.booksMetadata)
+  const data = await kdpFetchJson<unknown>(page, KDP_API.booksMetadata, [400, 404, 405])
   if (!data) return []
   return parseBooksMetadataRefs(data)
 }

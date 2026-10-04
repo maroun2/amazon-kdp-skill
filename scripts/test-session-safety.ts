@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process'
 import type { BrowserContext, Locator } from 'playwright'
 
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'kdp-safety-'))
+process.env.KDP_REQUEST_DELAY_MS = '0' // Local fixtures only; no Amazon traffic.
 process.env.KDP_SESSION_DIR = dir
 process.env.KDP_EGRESS_CONFIG = path.join(dir, 'egress.json')
 const { atomicPrivateJson, withPrivateLock, OperationBusyError } = await import('../server/src/privateState.js')
@@ -159,4 +160,17 @@ test('systemd environment without PATH still resolves flock and SSH', async () =
     assert.ok(path.isAbsolute(await resolveSystemCommand('ssh')))
     await withSessionOperation(async()=>{})
   } finally { if (original === undefined) delete process.env.PATH; else process.env.PATH = original }
+})
+
+
+test('optional reports discovery falls back on 400 without hiding auth or service errors', async () => {
+  const {kdpFetchJson} = await import('../server/src/kdpHttp.js')
+  const {KdpAuthError,KdpClientError} = await import('../server/src/kdpClient.js')
+  const {fetchReportsBooksMetadata} = await import('../server/src/kdpReportsApi.js')
+  const pageFor = (status:number) => ({request:{get:async()=>({status:()=>status,ok:()=>status===200,url:()=> 'https://fixture.example/api',json:async()=>({})})}}) as unknown as import('playwright').Page
+  assert.deepEqual(await fetchReportsBooksMetadata(pageFor(400)),[])
+  await assert.rejects(kdpFetchJson(pageFor(400),'https://fixture.example/mandatory'),KdpClientError)
+  for (const status of [404,405]) assert.equal(await kdpFetchJson(pageFor(status),'https://fixture.example/optional',[400,404,405]),null)
+  await assert.rejects(fetchReportsBooksMetadata(pageFor(401)),KdpAuthError)
+  await assert.rejects(fetchReportsBooksMetadata(pageFor(500)),KdpClientError)
 })
