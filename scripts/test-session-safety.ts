@@ -127,3 +127,24 @@ test('parser, tunnel and challenge errors cannot request another login', async (
     assert.throws(()=>sessionStatusForFailure(error),e=>e===error)
   }
 })
+
+
+test('CLI preserves tunnel and parser failure codes without reporting disconnected', async () => {
+  const http = await import('node:http')
+  let code = 'egress_down'
+  const fixture = http.createServer((_req,res)=>{ res.writeHead(code === 'egress_down' ? 503 : 502,{'Content-Type':'application/json'}); res.end(JSON.stringify({code,error:'fixture failure'})) })
+  await new Promise<void>(resolve=>fixture.listen(0,'127.0.0.1',resolve))
+  const address = fixture.address() as {port:number}
+  try {
+    for (code of ['egress_down','kdp']) {
+      const cli = spawn(process.execPath,['scripts/kdp-cli.mjs','status'],{cwd:process.cwd(),env:{...process.env,KDP_API_URL:`http://127.0.0.1:${address.port}`},stdio:['ignore','pipe','pipe']})
+      let stderr = ''; let stdout = ''
+      cli.stderr.on('data',chunk=>{stderr+=chunk})
+      cli.stdout.on('data',chunk=>{stdout+=chunk})
+      const exit = await new Promise(resolve=>cli.once('exit',resolve))
+      assert.equal(exit,1)
+      assert.equal(JSON.parse(stderr).code,code)
+      assert.equal(stdout,'')
+    }
+  } finally { await new Promise<void>(resolve=>fixture.close(()=>resolve())) }
+})

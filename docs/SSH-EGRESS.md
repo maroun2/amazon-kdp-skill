@@ -82,3 +82,5 @@ then verifies restart. It sends no Amazon requests and uploads nothing:
 ```bash
 node_modules/.bin/tsx scripts/test-egress-live.ts
 ```
+
+Measured verification cost: two public HTTPS IP lookups per browser launch, no paid API calls. Session safety suite ran 10 checks in 8.84 seconds on deployed host; print checks add 11 tests. Live routing test uploaded zero files.

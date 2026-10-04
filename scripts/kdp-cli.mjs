@@ -235,6 +235,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e)
+  console.error(JSON.stringify({ code: e.code ?? 'unknown', error: e instanceof Error ? e.message : String(e) }))
   process.exit(1)
 })
