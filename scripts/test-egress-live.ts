@@ -7,6 +7,9 @@ import { SESSION_DIR } from '../server/src/config.js'
 import { launchKdpBrowser } from '../server/src/browserLaunch.js'
 import { withSessionOperation } from '../server/src/session.js'
 
+const originalPath = process.env.PATH
+process.env.PATH = '/nonexistent'
+try {
 await withSessionOperation(async () => {
   const browser = await launchKdpBrowser({ headless: true })
   try {
@@ -29,3 +32,5 @@ await withSessionOperation(async () => {
   await restarted.close()
   console.log(JSON.stringify({ tunnelRestartVerified:true }))
 })
+
+} finally { if (originalPath === undefined) delete process.env.PATH; else process.env.PATH = originalPath }

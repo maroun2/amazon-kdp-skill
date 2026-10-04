@@ -3,7 +3,7 @@ import path from 'node:path'
 import net from 'node:net'
 import { spawn } from 'node:child_process'
 import { SESSION_DIR } from './config.js'
-import { atomicPrivateJson, withPrivateLock } from './privateState.js'
+import { atomicPrivateJson, withPrivateLock, resolveSystemCommand } from './privateState.js'
 
 export class EgressError extends Error {
   readonly code = 'egress_down'
@@ -61,8 +61,9 @@ export async function ensureEgress(): Promise<{ server: string; config: EgressCo
     if (await socksReady(c.socksPort)) throw new EgressError('SOCKS port already belongs to another or differently configured process. Stop it explicitly; no automatic route switch.')
     // A live recorded process may still be connecting; do not start duplicate tunnels.
     if (state && state.identity === await processIdentity(state.pid)) throw new EgressError('Recorded SSH tunnel is alive but unavailable. Wait or inspect tunnel; no direct fallback.')
+    const ssh = await resolveSystemCommand('ssh')
     const log = await fs.open(path.join(SESSION_DIR, 'egress-ssh.log'), 'a', 0o600)
-    const child = spawn('ssh', sshTunnelArgs(c), { detached: true, stdio: ['ignore', 'ignore', log.fd] })
+    const child = spawn(ssh, sshTunnelArgs(c), { detached: true, stdio: ['ignore', 'ignore', log.fd] })
     let launchError = false
     child.on('error', () => { launchError = true })
     let exited = false

@@ -24,7 +24,7 @@ export async function withPrivateLock<T>(file: string, fn: () => Promise<T>): Pr
   const handle = await fs.open(file, 'a', 0o600)
   await handle.chmod(0o600)
   await handle.close()
-  const gate = spawn('flock', ['-n', '-E', '75', file, process.execPath, '-e',
+  const gate = spawn(await resolveSystemCommand('flock'), ['-n', '-E', '75', file, process.execPath, '-e',
     'process.stdout.write("locked\\n");process.stdin.resume();process.stdin.on("end",()=>process.exit(0))'],
     { stdio: ['pipe', 'pipe', 'pipe'] })
   try {
@@ -44,4 +44,14 @@ export async function withPrivateLock<T>(file: string, fn: () => Promise<T>): Pr
       })
     }
   }
+}
+
+/** systemd on NixOS may omit system profile from PATH; use existing binaries only. */
+export async function resolveSystemCommand(name: 'flock' | 'ssh'): Promise<string> {
+  const dirs = [...(process.env.PATH || '').split(path.delimiter), '/run/current-system/sw/bin', '/usr/bin', '/bin'].filter(Boolean)
+  for (const dir of dirs) {
+    const candidate = path.resolve(dir, name)
+    try { await fs.access(candidate, 1); return candidate } catch { /* next existing binary */ }
+  }
+  throw new Error(`Required runtime binary ${name} is missing. Install it before account operations.`)
 }

@@ -148,3 +148,15 @@ test('CLI preserves tunnel and parser failure codes without reporting disconnect
     }
   } finally { await new Promise<void>(resolve=>fixture.close(()=>resolve())) }
 })
+
+
+test('systemd environment without PATH still resolves flock and SSH', async () => {
+  const {resolveSystemCommand} = await import('../server/src/privateState.js')
+  const original = process.env.PATH
+  try {
+    process.env.PATH = '/nonexistent'
+    assert.ok(path.isAbsolute(await resolveSystemCommand('flock')))
+    assert.ok(path.isAbsolute(await resolveSystemCommand('ssh')))
+    await withSessionOperation(async()=>{})
+  } finally { if (original === undefined) delete process.env.PATH; else process.env.PATH = original }
+})
