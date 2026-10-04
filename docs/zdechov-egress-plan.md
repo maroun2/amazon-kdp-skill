@@ -2,7 +2,7 @@
 
 Implemented through same HA SSH endpoint used by Sbazar. Direct Zdechov hostname was unreachable; user selected HA. SSH exit and both Playwright paths verified as `193.108.20.52`, localhost SOCKS port 11081. See [SSH-EGRESS.md](SSH-EGRESS.md) for current operational instructions.
 
-Verification: 19 tests pass across session safety, print parser and print upload controls. Live proxy test stops SSH, confirms both browser and API fail, then confirms restart through same exit. No uploads during verification. Existing saved Amazon session requires sign-in; failed check preserves session file. Long duration authenticated reuse remains unverified until user completes normal login. Six repository TypeScript diagnostics predate this change and remain unchanged.
+Verification: 20 tests pass across session safety, print parser and print upload controls. Live proxy test stops SSH, confirms both browser and API fail, then confirms restart through same exit. No uploads during verification. Existing saved Amazon session requires sign-in; failed check preserves session file. Long duration authenticated reuse remains unverified until user completes normal login. Six repository TypeScript diagnostics predate this change and remain unchanged.
 
 ## Original design
 

@@ -114,9 +114,7 @@ app.post('/api/kdp/login/start', async (_req, res) => {
       })
       return
     }
-    res.status(400).json({
-      error: e instanceof Error ? e.message : 'Could not start login.',
-    })
+    handleKdpError(res, e, 'Could not start login.')
   }
 })
 

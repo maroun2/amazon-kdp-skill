@@ -136,10 +136,7 @@ export async function checkSession(): Promise<{
       return { connected: true, accountCreationDate }
     })
   } catch (e) {
-    if (e instanceof KdpAuthError) {
-      return { connected: false, code: 'auth_required' }
-    }
-    throw e
+    return sessionStatusForFailure(e)
   }
 }
 
@@ -207,4 +204,10 @@ export async function downloadLifetimeRoyaltiesReport(): Promise<{
   monthsDownloaded: number
 }> {
   return downloadRoyaltiesReport()
+}
+
+/** Only proven authentication failure requests login; every other cause stays an error. */
+export function sessionStatusForFailure(error: unknown): { connected: false; code: 'auth_required' } {
+  if (error instanceof KdpAuthError) return { connected: false, code: 'auth_required' }
+  throw error
 }

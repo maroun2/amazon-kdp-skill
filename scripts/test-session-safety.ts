@@ -118,3 +118,12 @@ test('real browser refreshes request cookies; auth redirect, parser failure and 
     assert.equal(await fs.readFile(sessionFilePath(),'utf8'),saved)
   } finally { await browser.close(); await new Promise<void>(resolve=>fixture.close(()=>resolve())) }
 })
+
+
+test('parser, tunnel and challenge errors cannot request another login', async () => {
+  const {sessionStatusForFailure,KdpAuthError,KdpClientError,KdpChallengeError} = await import('../server/src/kdpClient.js')
+  assert.deepEqual(sessionStatusForFailure(new KdpAuthError()),{connected:false,code:'auth_required'})
+  for (const error of [new KdpClientError('schema changed'),new EgressError('tunnel down'),new KdpChallengeError(),new Error('service failure')]) {
+    assert.throws(()=>sessionStatusForFailure(error),e=>e===error)
+  }
+})

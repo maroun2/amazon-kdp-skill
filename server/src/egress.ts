@@ -14,7 +14,7 @@ export const egressConfigPath = () => process.env.KDP_EGRESS_CONFIG || path.join
 
 export function validateEgressConfig(value: unknown): EgressConfig {
   const c = value as EgressConfig
-  if (!c || !/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(c.sshHost) || !/^[a-zA-Z0-9_][a-zA-Z0-9_-]*$/.test(c.sshUser) ||
+  if (!c || typeof c.sshHost !== 'string' || typeof c.sshUser !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(c.sshHost) || !/^[a-zA-Z0-9_][a-zA-Z0-9_-]*$/.test(c.sshUser) ||
     !Number.isInteger(c.sshPort) || c.sshPort < 1 || c.sshPort > 65535 ||
     !Number.isInteger(c.socksPort) || c.socksPort < 1024 || c.socksPort > 65535 ||
     (c.expectedIp !== undefined && !net.isIP(c.expectedIp))) throw new EgressError('Invalid SSH egress configuration. Direct fallback is disabled.')
@@ -105,7 +105,7 @@ export async function readEgressStatus() {
     const config = await readEgressConfig()
     const state = JSON.parse(await fs.readFile(path.join(SESSION_DIR, 'egress-process.json'), 'utf8'))
     const pin = JSON.parse(await fs.readFile(path.join(SESSION_DIR, 'egress-ip.json'), 'utf8'))
-    const ready = state.target === fingerprint(config) && state.identity === await processIdentity(state.pid) && await socksReady(config.socksPort)
+    const ready = pin.target === fingerprint(config) && (!config.expectedIp || pin.ip === config.expectedIp) && state.target === fingerprint(config) && state.identity === await processIdentity(state.pid) && await socksReady(config.socksPort)
     return { required: true, ready, socksPort: config.socksPort, exitIp: pin.ip, verifiedAt: pin.verifiedAt ?? null }
   } catch { return { required: true, ready: false } }
 }

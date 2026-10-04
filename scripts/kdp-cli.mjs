@@ -14,7 +14,7 @@ async function api(pathname, options = {}) {
   const contentType = res.headers.get('content-type') || ''
   if (contentType.includes('application/json')) {
     const data = await res.json()
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+    if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { code: data.code ?? 'unknown', status: res.status })
     return data
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -111,7 +111,7 @@ async function main() {
         signal: controller.signal,
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { code: data.code ?? 'unknown', status: res.status })
       console.log(JSON.stringify({ syncedAt: data.syncedAt, count: data.count, stats: data.stats }, null, 2))
     } finally {
       clearTimeout(timeout)
